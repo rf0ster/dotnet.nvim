@@ -79,15 +79,15 @@ function M.clean(target)
     return run_cmd("dotnet clean" .. add_target(target))
 end
 
-function M.mstest(target, filter)
-    local function add_filter()
-        if filter ~= nil and filter ~= "" then
-            return " --filter " .. filter
+function M.mstest(target, filter, logger)
+    local function add_param(name, value)
+        if value ~= nil and value ~= "" then
+            return " --" .. name .. " " .. value
         else
             return ""
         end
     end
-    return run_cmd("dotnet test" .. add_target(target) .. add_filter())
+    return run_cmd("dotnet test" .. add_target(target) .. add_param("filter", filter) .. add_param("logger", logger))
 end
 
 -- Opens a picker with the command history.
