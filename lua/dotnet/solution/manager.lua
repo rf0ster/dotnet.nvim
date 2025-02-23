@@ -2,7 +2,7 @@ local M = {}
 
 local actions_state = require "telescope.actions.state"
 local actions       = require "telescope.actions"
-local confirmation  = require "dotnet.confirmation"
+local confirm       = require "dotnet.confirm"
 local solution      = require "dotnet.solution"
 local picker        = require "dotnet.picker"
 local cli           = require "dotnet.cli"
@@ -191,7 +191,7 @@ function M.open_projects()
                 fn = function()
                     local selection = actions_state.get_selected_entry()
                     local prompt ="Delete " .. selection.value ..  " from " .. sln_info.name .. "?"
-                    confirmation.open({
+                    confirm.open({
                         prompt_title = "Delete Project",
                         prompt = {prompt},
                         on_close = function(answer)

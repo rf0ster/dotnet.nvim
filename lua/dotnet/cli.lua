@@ -23,6 +23,14 @@ local function add_target(target)
     return " " .. target
 end
 
+local function add_param(name, value)
+    if value ~= nil and value ~= "" then
+        return " --" .. name .. " " .. value
+    else
+        return ""
+    end
+end
+
 function M.sln_list(sln_file)
     return shell_command("dotnet sln " .. sln_file .. " list")
 end
@@ -80,13 +88,6 @@ function M.clean(target)
 end
 
 function M.mstest(target, filter, logger)
-    local function add_param(name, value)
-        if value ~= nil and value ~= "" then
-            return " --" .. name .. " " .. value
-        else
-            return ""
-        end
-    end
     return run_cmd("dotnet test" .. add_target(target) .. add_param("filter", filter) .. add_param("logger", logger))
 end
 
