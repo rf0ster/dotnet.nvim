@@ -1,6 +1,7 @@
 local M = {}
 
 local solution = require "dotnet.solution"
+local parser = require "dotnet.test_runner.parser"
 local cli = require "dotnet.cli"
 
 -- creates a namespace for the circle markers
@@ -63,6 +64,16 @@ local function get_test_info()
     }
 end
 
+local run_test = function()
+    local info = get_test_info()
+    local p = info.proj_name or ""
+    local t = info.test_name or ""
+
+    if p == "" then
+        return
+    end
+    cli.mstest(p, t, "\"trx;LogFileName=nvim_dotnet_results.trx\"")
+end
 
 -- Creates a new window with the buffer
 local create_windows = function()
@@ -126,20 +137,46 @@ local create_windows = function()
             local p = info.proj_name or ""
             local t = info.test_name or ""
 
-            if p == "" then
+            if p == "" or t == "" then
+                vim.api.nvim_buf_set_lines(M.bufnr_results, 0, -1, false, {})
                 return
             end
 
-            local result = {}
-            if t ~= "" then
-                result = {M.tests[p].tests[t].result}
+            local result = M.tests[p].tests[t].result
+            local nil_to_str = function(v)
+                if v == nil then
+                    return ""
+                end
+                return v
             end
-            vim.api.nvim_buf_set_lines(M.bufnr_results, 0, -1, false, result)
+            local output = {
+                " Result: " .. nil_to_str(result.outcome),
+                " Start Time: " .. nil_to_str(result.startTime),
+                " End Time: " .. nil_to_str(result.endTime),
+                " Duration: " .. nil_to_str(result.duration)
+            }
+            if result.output ~= nil then
+                table.insert(output, "")
+                table.insert(output, " Output:")
+                table.insert(output, "   Message: " .. result.output.Message)
+                table.insert(output, "   Stack Trace:")
+                for line in result.output.StackTrace:gmatch("[^\r\n]+") do
+                    table.insert(output, "   " .. line)
+                end
+            end
+
+            vim.api.nvim_buf_set_lines(M.bufnr_results, 0, -1, false, output)
         end
     })
 
     -- set current window to the test window
     vim.api.nvim_set_current_win(M.win_tests)
+
+    vim.api.nvim_buf_set_keymap(M.bufnr_tests, "n", "<CR>", "", {
+        noremap = true,
+        silent = true,
+        callback = run_test
+    })
 end
 
 
@@ -177,23 +214,44 @@ local function load_tests()
                 local name = line:match("^%s*(.-)%s*$")
                 tests[name] = {
                     name = name,
-                    result = "Results for " .. name
+                    result = { "No Results" }
                 }
             end
         end
 
         if tests ~= nil then
+            local results_file = project.file:match("(.*/)") .. "TestResults/nvim_dotnet_results.trx"
             M.tests[project.file] = {
                 proj_name = project.name,
                 proj_file = project.file,
+                results_file = results_file,
                 tests = tests
             }
         end
     end
 end
 
+local load_results = function()
+    for _, project in pairs(M.tests) do
+        local results = parser.parse_trx_file(project.results_file)
+        if results == nil then
+            project.outcome = nil
+            break
+        end
+
+        local res = "Passed"
+        for _, test_result in pairs(results) do
+            project.tests[test_result.testName].result = test_result
+            if test_result.outcome == "Failed" then
+                res = "Failed"
+            end
+        end
+        project.outcome = res
+    end
+end
+
 -- Pretty prints the tests to the buffer with cool circle markers
-local write_test = function(text, spaces)
+local write_test = function(text, spaces, highlight)
     local line_num = vim.api.nvim_buf_line_count(M.bufnr_tests)
 
     if not spaces then
@@ -212,7 +270,7 @@ local write_test = function(text, spaces)
 
     vim.api.nvim_buf_set_lines(M.bufnr_tests, -1, -1, false, {res})
     vim.api.nvim_buf_set_extmark(M.bufnr_tests, ns_id, line_num, spaces - 2, {
-        virt_text = {{"●", "Comment"}},
+        virt_text = {{"●", highlight}},
         virt_text_pos = "overlay"
     })
 end
@@ -231,12 +289,25 @@ local write_tests_to_buffer = function()
         return
     end
 
+    local get_highlight = function(outcome)
+        if outcome == nil then
+            return "Comment"
+        end
+        if outcome == "Passed" then
+            return "String"
+        end
+        if outcome == "Failed" then
+            return "ErrorMsg"
+        end
+        return "Comment"
+    end
+
     -- Write the tests to the buffer
     for key, val in pairs(M.tests) do
-        write_test(key, 2)
+        write_test(key, 2, get_highlight(val.outcome))
         if val.tests ~= nil then
-            for k, _ in pairs(val.tests) do
-                write_test(k, 4)
+            for k, v in pairs(val.tests) do
+                write_test(k, 4, get_highlight(v.result.outcome))
             end
         end
     end
@@ -257,12 +328,10 @@ M.open = function()
     if M.tests == nil then
         load_tests()
     end
-
+    load_results()
     create_windows()
-
     write_tests_to_buffer()
     set_buffer_options(M.bufnr_tests)
-    --set_buffer_options(M.bufnr_results)
 end
 
 return M
