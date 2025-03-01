@@ -90,17 +90,6 @@ M.parse_trx_file = function(file_path)
         end
     end
 
-    -- print the results to the screen
-    local debug = function()
-        for _, test in ipairs(test_results) do
-            print("Test Name: " .. test.testName)
-            print("Outcome: " .. test.outcome)
-            print("Duration: " .. test.duration)
-            print("Start Time: " .. test.startTime)
-            print("End Time: " .. test.endTime)
-        end
-    end
-
     return test_results
 end
 

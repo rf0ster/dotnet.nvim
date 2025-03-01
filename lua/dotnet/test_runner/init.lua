@@ -107,7 +107,7 @@ local create_windows = function()
 
     -- Create test results window
     M.bufnr_results = vim.api.nvim_create_buf(false, true)
-    M.win_results = create_win(M.bufnr_results, "Results", col + math.floor(width * 0.5) + 1)
+    M.win_results = create_win(M.bufnr_results, "Results", col + math.floor(width * 0.5) + 2)
 
     -- Close both windows when either buffer is closed.
     local close_windows = function()
