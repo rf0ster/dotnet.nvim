@@ -79,4 +79,40 @@ function M.run_cmd(cmd)
     })
 end
 
+M.jobstart = function(cmd, bufnr, win)
+    local function on_output(_, data, _)
+        if data then
+            for _, line in ipairs(data) do
+                if line:match("^%s*$") then
+                    line = ""
+                end
+
+                if line ~= "" then
+                    -- Replace carriage return (^M) with nothing
+                    -- Is this only on windows??
+                    line = string.gsub(line, "\r", "")
+                    -- Trim leading and trailing whitespace
+                    line = line:gsub("^%s+", ""):gsub("%s+$", "")
+                    -- Add indentation
+                    line = " " .. line
+                end
+                vim.api.nvim_buf_set_lines(bufnr, -1, -1, false, {line})
+            end
+        end
+
+        local last_line = vim.api.nvim_buf_line_count(bufnr)
+        vim.api.nvim_win_set_cursor(win, {last_line, 0})
+    end
+
+    vim.fn.jobstart(cmd, {
+        on_stdout = on_output,
+        on_stderr = on_output,
+        on_exit = function()
+            vim.bo[bufnr].modifiable = false
+        end,
+        stdout_buffered = false,
+        stderr_buffered = false,
+    })
+end
+
 return M

@@ -72,29 +72,40 @@ local run_test = function()
     if p == "" then
         return
     end
-    cli.mstest(p, t, "\"trx;LogFileName=nvim_dotnet_results.trx\"")
+
+    local filter = ""
+    if t ~= "" then
+        filter = " --filter " .. t
+    end
+
+    -- clear contents of the output buffer
+    vim.bo[M.bufnr_output].modifiable = true
+    vim.api.nvim_buf_set_lines(M.bufnr_output, 0, -1, false, {})
+
+    local cmd = "dotnet test " .. p .. filter .. " --logger \"trx;LogFileName=nvim_dotnet_results.trx\""
+    require "dotnet.output".jobstart(cmd, M.bufnr_output, M.win_output)
 end
 
 -- Creates a new window with the buffer
 local create_windows = function()
-    -- Calculate window sizes
+    -- Calculate max window area for all windows
 	local height = math.floor(vim.o.lines * 0.8)
-	local width = math.floor(vim.o.columns * 0.8) -- Two windows, divide by 2
+	local width = math.floor(vim.o.columns * 0.8)
 	local row = math.floor((vim.o.lines - height) / 2)
 	local col = math.floor((vim.o.columns - width) / 2)
 
-    local create_win = function(bufnr, title, c)
+    local output_height = math.floor(height * 0.2)
+    local create_win = function(bufnr, title, c, w)
         local win = vim.api.nvim_open_win(bufnr, true, {
             title = " " .. title,
             relative = "editor",
-            height = height,
-            width = math.floor(width * 0.5),
+            height = math.floor(height - output_height) - 3,
+            width = w,
             row = row,
             col = c,
             style = "minimal",
             border = "rounded",
         })
-        vim.wo[win].statusline = "hello"
         vim.wo[win].cursorcolumn = false
         vim.wo[win].cursorline = false
         vim.wo[win].wrap = false
@@ -103,19 +114,35 @@ local create_windows = function()
 
     -- Create test selection window
     M.bufnr_tests = vim.api.nvim_create_buf(false, true)
-    M.win_tests = create_win(M.bufnr_tests, "Test Runner", col)
+    M.win_tests = create_win(M.bufnr_tests, "Test Runner", col, math.floor(width * 0.5) - 1)
 
     -- Create test results window
     M.bufnr_results = vim.api.nvim_create_buf(false, true)
-    M.win_results = create_win(M.bufnr_results, "Results", col + math.floor(width * 0.5) + 2)
+    M.win_results = create_win(M.bufnr_results, "Results", col + math.floor(width * 0.5) + 1, math.floor(width * 0.5) - 1)
 
-    -- Close both windows when either buffer is closed.
+    -- Create test output window
+    M.bufnr_output = vim.api.nvim_create_buf(false, true)
+    M.win_output = vim.api.nvim_open_win(M.bufnr_output, true, {
+        title = " Output",
+        relative = "editor",
+        height = output_height,
+        width = width,
+        row = row + math.floor(height * 0.8),
+        col = col,
+        style = "minimal",
+        border = "rounded",
+    })
+
+    -- Close all windows when either buffer is closed.
     local close_windows = function()
         if vim.api.nvim_win_is_valid(M.win_tests) then
             vim.api.nvim_win_close(M.win_tests, true)
         end
         if vim.api.nvim_win_is_valid(M.win_results) then
             vim.api.nvim_win_close(M.win_results, true)
+        end
+        if vim.api.nvim_win_is_valid(M.win_output) then
+            vim.api.nvim_win_close(M.win_output, true)
         end
     end
 
@@ -126,6 +153,10 @@ local create_windows = function()
     })
     vim.api.nvim_create_autocmd(evts, {
         buffer = M.bufnr_results,
+        callback = close_windows
+    })
+    vim.api.nvim_create_autocmd(evts, {
+        buffer = M.bufnr_output,
         callback = close_windows
     })
 
