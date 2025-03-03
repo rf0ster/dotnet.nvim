@@ -34,17 +34,6 @@ M.parse_trx_file = function(file_path)
     end
     xml_content = clean_xml(xml_content)
 
-    -- get input from the user
-    -- vim.fn.input(xml_content)
-
-    -- Write xml content to file, create if needed
-    --local f = io.open("temp_file.trx", "w")
-    --if not f then
-        --return nil
-    --end
-    --f:write(xml_content)
-    --f:close()
-
     -- Parse the XML using xml2lua
     local tree = handler:new()
     local parser = xml2lua.parser(tree)

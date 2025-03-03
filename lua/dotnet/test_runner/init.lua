@@ -7,6 +7,12 @@ local cli = require "dotnet.cli"
 -- creates a namespace for the circle markers
 local ns_id = vim.api.nvim_create_namespace("circle_namespace")
 
+
+local set_buf_modifiable = function(bufnr, modifiable)
+    vim.api.nvim_buf_set_option(bufnr, "readonly", not modifiable)
+    vim.api.nvim_buf_set_option(bufnr, "modifiable", modifiable)
+end
+
 -- Given a row, reads the line to capture the test name.
 -- If the test name is not a .csproj files, then iterate down
 -- through the buffer until a .csproj file is found.
@@ -64,6 +70,142 @@ local function get_test_info()
     }
 end
 
+
+-- Loads the tests from the solution
+local function load_tests()
+    local sln = solution.get_solution()
+    if sln == nil then
+        return
+    end
+
+    local projects = solution.get_projects()
+    if not projects then
+        return
+    end
+
+    M.tests = {}
+    for _, project in ipairs(projects) do
+        local output = cli.test_list_all(project.file)
+        if not output then
+            break
+        end
+
+        local tests = nil
+        local test_capture_start = false
+        for _, line in ipairs(output) do
+            -- If the line contains the text "The following Tests are available",
+            -- then we can start capturing the tests.
+            -- This is a major assumption of the dotnet cli, andy may break in the future.
+            if line:find('The following Tests are available') then
+                test_capture_start = true
+            elseif test_capture_start and line ~= '' then
+                if tests == nil then
+                    tests = {}
+                end
+                local name = line:match("^%s*(.-)%s*$")
+                tests[name] = {
+                    name = name,
+                    result = { "No Results" }
+                }
+            end
+        end
+
+        if tests ~= nil then
+            local results_file = project.file:match("(.*/)") .. "TestResults/nvim_dotnet_results.trx"
+            M.tests[project.file] = {
+                proj_name = project.name,
+                proj_file = project.file,
+                results_file = results_file,
+                tests = tests
+            }
+        end
+    end
+end
+
+local load_results = function()
+    for _, project in pairs(M.tests) do
+        local results = parser.parse_trx_file(project.results_file)
+        if results == nil then
+            project.outcome = nil
+            break
+        end
+
+        local res = "Passed"
+        for _, test_result in pairs(results) do
+            project.tests[test_result.testName].result = test_result
+            if test_result.outcome == "Failed" then
+                res = "Failed"
+            end
+        end
+        project.outcome = res
+    end
+end
+
+-- Pretty prints the tests to the buffer with cool circle markers
+local write_test = function(text, spaces, highlight)
+    local line_num = vim.api.nvim_buf_line_count(M.bufnr_tests)
+
+    if not spaces then
+        spaces = 0
+    end
+    if spaces < 2 then
+        spaces = 2
+    end
+    spaces = spaces + 1
+
+    local res = ""
+    for _ = 1, spaces do
+        res = res .. " "
+    end
+    res = res .. text
+
+    vim.api.nvim_buf_set_lines(M.bufnr_tests, -1, -1, false, {res})
+    vim.api.nvim_buf_set_extmark(M.bufnr_tests, ns_id, line_num, spaces - 2, {
+        virt_text = {{"●", highlight}},
+        virt_text_pos = "overlay"
+    })
+end
+
+-- Writes tests to buffer
+local write_tests_to_buffer = function()
+    set_buf_modifiable(M.bufnr_tests, true)
+    -- Clears all text from the buffer
+    vim.api.nvim_buf_set_lines(M.bufnr_tests, 0, -1, false, {})
+    -- Clears all extmarks from the buffer
+    vim.api.nvim_buf_clear_namespace(M.bufnr_tests, ns_id, 0, -1)
+    -- Sets cursor to first line in buffer
+    vim.api.nvim_win_set_cursor(M.win_tests, {1, 0})
+
+    -- Load the tests
+    if M.tests == nil then
+        return
+    end
+
+    local get_highlight = function(outcome)
+        if outcome == nil then
+            return "Comment"
+        end
+        if outcome == "Passed" then
+            return "String"
+        end
+        if outcome == "Failed" then
+            return "ErrorMsg"
+        end
+        return "Comment"
+    end
+
+    -- Write the tests to the buffer
+    for key, val in pairs(M.tests) do
+        write_test(key, 2, get_highlight(val.outcome))
+        if val.tests ~= nil then
+            for k, v in pairs(val.tests) do
+                write_test(k, 4, get_highlight(v.result.outcome))
+            end
+        end
+    end
+    set_buf_modifiable(M.bufnr_tests, false)
+end
+
 local run_test = function()
     local info = get_test_info()
     local p = info.proj_name or ""
@@ -78,12 +220,30 @@ local run_test = function()
         filter = " --filter " .. t
     end
 
+    local output = require "dotnet.output"
+    local on_output = function(_, data, _)
+        if data then
+            for _, line in ipairs(data) do
+                vim.api.nvim_buf_set_lines(M.bufnr_output, -1, -1, false, {output.clean_line(line)})
+            end
+        end
+        local last_line = vim.api.nvim_buf_line_count(M.bufnr_output)
+        vim.api.nvim_win_set_cursor(M.win_output, {last_line, 0})
+    end
+
     -- clear contents of the output buffer
-    vim.bo[M.bufnr_output].modifiable = true
+    set_buf_modifiable(M.bufnr_output, true)
     vim.api.nvim_buf_set_lines(M.bufnr_output, 0, -1, false, {})
 
-    local cmd = "dotnet test " .. p .. filter .. " --logger \"trx;LogFileName=nvim_dotnet_results.trx\""
-    require "dotnet.output".jobstart(cmd, M.bufnr_output, M.win_output)
+    vim.fn.jobstart("dotnet test " .. p .. filter .. " --logger \"trx;LogFileName=nvim_dotnet_results.trx\"", {
+        on_stdout = on_output,
+        on_stderr = on_output,
+        on_exit = function()
+            load_results()
+            write_tests_to_buffer()
+            set_buf_modifiable(M.bufnr_output, false)
+        end
+    })
 end
 
 -- Creates a new window with the buffer
@@ -210,147 +370,12 @@ local create_windows = function()
     })
 end
 
-
--- Loads the tests from the solution
-local function load_tests()
-    local sln = solution.get_solution()
-    if sln == nil then
-        return
-    end
-
-    local projects = solution.get_projects()
-    if not projects then
-        return
-    end
-
-    M.tests = {}
-    for _, project in ipairs(projects) do
-        local output = cli.test_list_all(project.file)
-        if not output then
-            break
-        end
-
-        local tests = nil
-        local test_capture_start = false
-        for _, line in ipairs(output) do
-            -- If the line contains the text "The following Tests are available",
-            -- then we can start capturing the tests.
-            -- This is a major assumption of the dotnet cli, andy may break in the future.
-            if line:find('The following Tests are available') then
-                test_capture_start = true
-            elseif test_capture_start and line ~= '' then
-                if tests == nil then
-                    tests = {}
-                end
-                local name = line:match("^%s*(.-)%s*$")
-                tests[name] = {
-                    name = name,
-                    result = { "No Results" }
-                }
-            end
-        end
-
-        if tests ~= nil then
-            local results_file = project.file:match("(.*/)") .. "TestResults/nvim_dotnet_results.trx"
-            M.tests[project.file] = {
-                proj_name = project.name,
-                proj_file = project.file,
-                results_file = results_file,
-                tests = tests
-            }
-        end
-    end
-end
-
-local load_results = function()
-    for _, project in pairs(M.tests) do
-        local results = parser.parse_trx_file(project.results_file)
-        if results == nil then
-            project.outcome = nil
-            break
-        end
-
-        local res = "Passed"
-        for _, test_result in pairs(results) do
-            project.tests[test_result.testName].result = test_result
-            if test_result.outcome == "Failed" then
-                res = "Failed"
-            end
-        end
-        project.outcome = res
-    end
-end
-
--- Pretty prints the tests to the buffer with cool circle markers
-local write_test = function(text, spaces, highlight)
-    local line_num = vim.api.nvim_buf_line_count(M.bufnr_tests)
-
-    if not spaces then
-        spaces = 0
-    end
-    if spaces < 2 then
-        spaces = 2
-    end
-    spaces = spaces + 1
-
-    local res = ""
-    for _ = 1, spaces do
-        res = res .. " "
-    end
-    res = res .. text
-
-    vim.api.nvim_buf_set_lines(M.bufnr_tests, -1, -1, false, {res})
-    vim.api.nvim_buf_set_extmark(M.bufnr_tests, ns_id, line_num, spaces - 2, {
-        virt_text = {{"●", highlight}},
-        virt_text_pos = "overlay"
-    })
-end
-
--- Writes tests to buffer
-local write_tests_to_buffer = function()
-    -- Clears all text from the buffer
-    vim.api.nvim_buf_set_lines(M.bufnr_tests, 0, -1, false, {})
-    -- Clears all extmarks from the buffer
-    vim.api.nvim_buf_clear_namespace(M.bufnr_tests, ns_id, 0, -1)
-    -- Sets cursor to first line in buffer
-    vim.api.nvim_win_set_cursor(M.win_tests, {1, 0})
-
-    -- Load the tests
-    if M.tests == nil then
-        return
-    end
-
-    local get_highlight = function(outcome)
-        if outcome == nil then
-            return "Comment"
-        end
-        if outcome == "Passed" then
-            return "String"
-        end
-        if outcome == "Failed" then
-            return "ErrorMsg"
-        end
-        return "Comment"
-    end
-
-    -- Write the tests to the buffer
-    for key, val in pairs(M.tests) do
-        write_test(key, 2, get_highlight(val.outcome))
-        if val.tests ~= nil then
-            for k, v in pairs(val.tests) do
-                write_test(k, 4, get_highlight(v.result.outcome))
-            end
-        end
-    end
-end
-
 -- set buffer options
 local set_buffer_options = function(bufnr)
-    vim.api.nvim_buf_set_option(bufnr, "modifiable", false)  -- No editing
+    set_buf_modifiable(bufnr, false)
     vim.api.nvim_buf_set_option(bufnr, "buftype", "nofile")  -- Not a real file
     vim.api.nvim_buf_set_option(bufnr, "swapfile", false)    -- No swap file
     vim.api.nvim_buf_set_option(bufnr, "bufhidden", "wipe")  -- Close on exit
-    vim.api.nvim_buf_set_option(bufnr, "readonly", true)     -- Mark as read-only
     vim.api.nvim_buf_set_option(bufnr, "cursorline", true)   -- highlight current line
 end
 
