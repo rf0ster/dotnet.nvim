@@ -123,21 +123,23 @@ local function load_tests()
 end
 
 local load_results = function()
-    for _, project in pairs(M.tests) do
-        local results = parser.parse_trx_file(project.results_file)
+    for _, test_project in pairs(M.tests) do
+        local results = parser.parse_trx_file(test_project.results_file)
         if results == nil then
-            project.outcome = nil
-            break
-        end
-
-        local res = "Passed"
-        for _, test_result in pairs(results) do
-            project.tests[test_result.testName].result = test_result
-            if test_result.outcome == "Failed" then
-                res = "Failed"
+            test_project.outcome = nil
+            for _, test in pairs(test_project.tests) do
+                test.result = { outcome = nil }
             end
+        else
+            local res = "Passed"
+            for _, test_result in pairs(results) do
+                test_project.tests[test_result.testName].result = test_result
+                if test_result.outcome == "Failed" then
+                    res = "Failed"
+                end
+            end
+            test_project.outcome = res
         end
-        project.outcome = res
     end
 end
 
@@ -169,12 +171,17 @@ end
 -- Writes tests to buffer
 local write_tests_to_buffer = function()
     set_buf_modifiable(M.bufnr_tests, true)
+
     -- Clears all text from the buffer
     vim.api.nvim_buf_set_lines(M.bufnr_tests, 0, -1, false, {})
     -- Clears all extmarks from the buffer
     vim.api.nvim_buf_clear_namespace(M.bufnr_tests, ns_id, 0, -1)
     -- Sets cursor to first line in buffer
     vim.api.nvim_win_set_cursor(M.win_tests, {1, 0})
+    -- Write header in the first line of the buffer
+    vim.api.nvim_buf_set_lines(M.bufnr_tests, 0, -1, false, {" (R)eload Tests"})
+    -- Write an empy line to the buffer
+    vim.api.nvim_buf_set_lines(M.bufnr_tests, 1, -1, false, {""})
 
     -- Load the tests
     if M.tests == nil then
@@ -203,6 +210,7 @@ local write_tests_to_buffer = function()
             end
         end
     end
+
     set_buf_modifiable(M.bufnr_tests, false)
 end
 
@@ -368,6 +376,11 @@ local create_windows = function()
         silent = true,
         callback = run_test
     })
+    vim.api.nvim_buf_set_keymap(M.bufnr_tests, "n", "R", "", {
+        noremap = true,
+        silent = true,
+        callback = M.reload
+    })
 end
 
 -- set buffer options
@@ -377,6 +390,13 @@ local set_buffer_options = function(bufnr)
     vim.api.nvim_buf_set_option(bufnr, "swapfile", false)    -- No swap file
     vim.api.nvim_buf_set_option(bufnr, "bufhidden", "wipe")  -- Close on exit
     vim.api.nvim_buf_set_option(bufnr, "cursorline", true)   -- highlight current line
+end
+
+-- Reloads the tests and writes them to the buffer
+M.reload = function()
+    load_tests()
+    load_results()
+    write_tests_to_buffer()
 end
 
 -- Opens the test runner window
