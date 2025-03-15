@@ -123,4 +123,9 @@ function M.run_last_cmd()
     end
 end
 
+-- Adds a package to the given project.
+function M.add_package(project, package, version)
+    return run_cmd("dotnet add " .. project .. " package " .. package .. add_param("version", version))
+end
+
 return M

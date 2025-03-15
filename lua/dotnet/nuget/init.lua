@@ -1,12 +1,13 @@
 local M = {}
 
+local actions_state = require "telescope.actions.state"
 local previewers = require "telescope.previewers"
 local finders = require "telescope.finders"
 local pickers = require "telescope.pickers"
 local sorters = require "telescope.sorters"
 local nuget = require "dotnet.nuget.api"
 
-function M.NugetManager()
+function M.NugetManager(project)
     local previewer = previewers.new_buffer_previewer ({
         define_preview = function(self, entry)
             -- clear the buffer
@@ -25,11 +26,16 @@ function M.NugetManager()
         }
     end
 
+    local current_picker = nil
     local dynamic_finder = function(prompt)
         if not prompt or prompt == "" then
             return {}
         end
-        return nuget.query(prompt)
+        if current_picker and current_picker.results_border then
+            local height = vim.api.nvim_win_get_height(current_picker.results_border.win_id)
+            return nuget.query(prompt, height)
+        end
+        return nuget.query(prompt, 5)
     end
 
     local opts = {
@@ -37,11 +43,11 @@ function M.NugetManager()
     }
     pickers.new(opts, {
         initial_mode = "normal",
-        prompt_title = "NuGet Manager",
+        prompt_title = "NuGet Manager - " .. project,
         results_title = "Results",
         finder = finders.new_dynamic {
             fn = dynamic_finder,
-            entry_maker = entry_maker,
+            entry_maker = entry_maker
         },
         sorter = sorters.get_generic_fuzzy_sorter(),
         sorting_strategy = "ascending",
@@ -52,11 +58,20 @@ function M.NugetManager()
             height = 0.5,
         },
         previewer = previewer,
-    }):find()
-end
+        attach_mappings = function(prompt_bufnr, map)
+            current_picker = actions_state.get_current_picker(prompt_bufnr)
+            local install = function()
+                local selection = actions_state.get_selected_entry()
+                require "dotnet.cli".add_package(project, selection.value.id, selection.value.version)
+            end
 
-function M.close()
-	return M.window.close()
+            map("i", "<CR>", install)
+            map("n", "<CR>", install)
+
+            return true
+        end
+    }):find()
+
 end
 
 return M

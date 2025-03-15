@@ -149,7 +149,7 @@ function M.open_projects()
 
     picker.picker({
         prompt_title = sln_info.name,
-        results_title = "Projects (b)uild - (r)estore - (c)lean - (d)elete",
+        results_title = "Projects (b)uild - (r)estore - (c)lean - (n)uget - (d)elete",
         items = projects,
         maps = {
             {
@@ -183,6 +183,14 @@ function M.open_projects()
                 fn = function()
                     local selection = actions_state.get_selected_entry()
                     cli.restore(project_file(selection.value))
+                end
+            },
+            {
+                mode = "n",
+                key = "n",
+                fn = function()
+                    local selection = actions_state.get_selected_entry()
+                    require "dotnet.nuget".NugetManager(project_file(selection.value))
                 end
             },
             {

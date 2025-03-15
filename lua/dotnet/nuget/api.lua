@@ -1,11 +1,11 @@
 local M = {}
 
+local curl = require "plenary.curl"
 local uri = "https://api-v2v3search-0.nuget.org"
 
 -- Function to search NuGet packages
-function M.query(query)
-	local curl = require "plenary.curl"
-	local res = curl.get(uri .. "/query?q=" .. query .. "&take=100")
+function M.query(query, take)
+	local res = curl.get(uri .. "/query?q=" .. query .. "&take=" .. take)
 
 	local packages = {}
 	if res.status == 200 then
