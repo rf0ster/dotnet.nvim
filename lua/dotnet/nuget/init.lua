@@ -6,8 +6,21 @@ local finders = require "telescope.finders"
 local pickers = require "telescope.pickers"
 local sorters = require "telescope.sorters"
 local nuget = require "dotnet.nuget.api"
+local utils = require "dotnet.utils"
 
 function M.NugetManager(project)
+    local win_opts = {
+        relative = "editor",
+        style = "minimal",
+        border = "double",
+        title = "NuGet Manager",
+        row = 1,
+        height = 10,
+    }
+    win_opts = utils.center_win_width(0.5, win_opts)
+    local bufnr, title_win_id = utils.float_win("NuGet Manager", win_opts)
+
+
     local previewer = previewers.new_buffer_previewer ({
         define_preview = function(self, entry)
             -- clear the buffer
@@ -38,12 +51,43 @@ function M.NugetManager(project)
         return nuget.query(prompt, 5)
     end
 
+    local resize_title_win = function(picker)
+        if not picker then
+            return
+        end
+
+        local prompt_win = picker.prompt_win
+        local results_win = picker.results_win
+        local preview_win = picker.preview_win
+
+        if not prompt_win or not results_win or not preview_win then
+            return
+        end
+
+        local prompt_config = vim.api.nvim_win_get_config(prompt_win)
+        local results_config = vim.api.nvim_win_get_config(results_win)
+        local preview_config = vim.api.nvim_win_get_config(preview_win)
+
+        local total_w = prompt_config.width + preview_config.width
+        local total_h = prompt_config.height + results_config.height
+
+        local c, r = prompt_config.col, prompt_config.row
+
+        vim.api.nvim_win_set_height(title_win_id, 20)
+        vim.api.nvim_win_set_width(title_win_id, 10)
+        vim.api.nvim_win_set_config(title_win_id, {
+            relative = "editor",
+            row = r - 5,
+            col = c - 1,
+        })
+        --vim.api.nvim_win_set_option(title_win_id, "winblend", 50)
+    end
     local opts = {
         layout_strategy = "horizontal"
     }
     pickers.new(opts, {
         initial_mode = "normal",
-        prompt_title = "NuGet Manager - " .. project,
+        prompt_title = "Search",
         results_title = "Results",
         finder = finders.new_dynamic {
             fn = dynamic_finder,
@@ -72,6 +116,8 @@ function M.NugetManager(project)
         end
     }):find()
 
+
+    resize_title_win(current_picker)
 end
 
 return M
