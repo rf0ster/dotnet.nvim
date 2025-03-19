@@ -67,11 +67,13 @@ local function open_proj(file)
         col = view_c,
     })
 
-    -- setups the different buffers
+    -- setup header buffer
+    vim.api.nvim_buf_set_option(header_bufnr, "buftype", "nofile")
     vim.api.nvim_buf_set_lines(header_bufnr, 0, -1, false, {
         "  (S)earch  |  (I)nstalled  |  (U)pdate"
     })
 
+    -- setup search buffer
     vim.api.nvim_buf_set_option(search_bufnr, "buftype", "nofile")
     vim.api.nvim_buf_set_option(search_bufnr, "modifiable", true)
     vim.api.nvim_buf_set_keymap(search_bufnr, 'i', '<CR>', '<NOP>', { noremap = true, silent = true })
@@ -80,9 +82,12 @@ local function open_proj(file)
     vim.api.nvim_buf_set_keymap(search_bufnr, 'n', 'p', '<NOP>', { noremap = true, silent = true })
     vim.api.nvim_buf_set_keymap(search_bufnr, 'n', 'P', '<NOP>', { noremap = true, silent = true })
 
-    local win_enter_cmd
-    local win_close_cmd
-    local search_cmd
+    -- setup results buffer
+    vim.api.nvim_buf_set_option(results_bufnr, "buftype", "nofile")
+    vim.api.nvim_buf_set_option(results_bufnr, "modifiable", false)
+    vim.api.nvim_buf_set_option(results_bufnr, "cursorline", true)
+
+    local autocmds = {}
     local function close_all()
         -- close all windows if they exist
         if vim.api.nvim_win_is_valid(header_win) then
@@ -98,40 +103,37 @@ local function open_proj(file)
             vim.api.nvim_win_close(view_win, true)
         end
 
-        -- remove cmds from nvim_create_autocmd
-        if win_enter_cmd then
-            vim.api.nvim_del_autocmd(win_enter_cmd)
-        end
-        if win_close_cmd then
-            vim.api.nvim_del_autocmd(win_close_cmd)
-        end
-        if search_cmd then
-            vim.api.nvim_del_autocmd(search_cmd)
+        for _, id in ipairs(autocmds) do
+            vim.api.nvim_del_autocmd(id)
         end
     end
 
-    win_enter_cmd = vim.api.nvim_create_autocmd("WinEnter", {
-        callback = function()
-            -- get focused window and bufnr
-            local win_id = vim.api.nvim_get_current_win()
-            if win_id ~= search_win and win_id ~= view_win and win_id ~= header_win and win_id ~= results_win then
-                close_all()
-            end
+    local apply_win_leave = function(bufnr)
+        local id = vim.api.nvim_create_autocmd("WinLeave", {
+            buffer = bufnr,
+            callback = function()
+                local win_id = vim.api.nvim_get_current_win()
+                if win_id ~= search_win and win_id ~= view_win and win_id ~= header_win and win_id ~= results_win then
+                    close_all()
+                end
+            end,
+        })
+        table.insert(autocmds, id)
+    end
+    apply_win_leave(header_bufnr)
+    apply_win_leave(search_bufnr)
+    apply_win_leave(results_bufnr)
+    apply_win_leave(view_bufnr)
 
-        end,
-    })
-    win_close_cmd = vim.api.nvim_create_autocmd("WinClosed", {
+    table.insert(autocmds, vim.api.nvim_create_autocmd("WinClosed", {
         pattern = header_win .. "," .. search_win .. "," .. results_win .. "," .. view_win,
-        callback = function()
-            close_all()
-        end,
-    })
+        callback = close_all,
+    }))
 
     local packages = {}
     local debounce_timer = nil
-    search_cmd = vim.api.nvim_create_autocmd("TextChangedI", {
-        -- TODO: Change this to a more specific pattern
-        pattern = "*",
+    table.insert(autocmds, vim.api.nvim_create_autocmd("TextChangedI", {
+        buffer = search_bufnr,
         callback = function()
             if debounce_timer then
                 vim.fn.timer_stop(debounce_timer)
@@ -152,8 +154,8 @@ local function open_proj(file)
                     return
                 end
 
-                print("Searching for: " .. query)
                 packages = api.query(query, results_h)
+                vim.api.nvim_buf_set_option(results_bufnr, "modifiable", true)
                 vim.api.nvim_buf_set_lines(results_bufnr, 0, -1, false, {})
 
                 if package and #packages > 0 then
@@ -163,10 +165,53 @@ local function open_proj(file)
                 else
                     vim.api.nvim_buf_set_lines(results_bufnr, -1, -1, false, {})
                 end
+                vim.api.nvim_buf_set_option(results_bufnr, "modifiable", false)
                 debounce_timer = nil
             end)
         end,
-    })
+    }))
+
+    table.insert(autocmds, vim.api.nvim_create_autocmd("CursorMoved", {
+        buffer = results_bufnr,
+        callback = function()
+            local line = vim.api.nvim_get_current_line()
+            if not line or line == "" then
+                return
+            end
+
+            local id = string.match(line, "%S+")
+            if not id or id == "" then
+                return
+            end
+
+            local package = nil
+            for _, result in ipairs(packages) do
+                if result.id == id then
+                    package = result
+                    break
+                end
+            end
+
+            vim.api.nvim_buf_set_option(view_bufnr, "modifiable", true)
+            if not package then
+                vim.api.nvim_buf_set_lines(view_bufnr, 0, -1, false, {})
+            else
+                local desc_lines = {}
+                for l in package.description:gmatch("[^\r\n]+") do
+                    table.insert(desc_lines, "  " .. l)
+                end
+
+                vim.api.nvim_buf_set_lines(view_bufnr, 0, -1, false, {
+                    "ID: " .. package.id,
+                    "Version: " .. package.version,
+                    "Description: "
+                })
+                vim.api.nvim_buf_set_lines(view_bufnr, -1, -1, false, desc_lines)
+            end
+
+            vim.api.nvim_buf_set_option(view_bufnr, "modifiable", false)
+        end
+    }))
 
     -- set keymap to close each window on <esc>
     vim.api.nvim_buf_set_keymap(search_bufnr, "n", "<esc>", ":q!<cr>", { noremap = true, silent = true })

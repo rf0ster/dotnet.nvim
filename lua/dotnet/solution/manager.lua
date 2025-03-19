@@ -190,7 +190,7 @@ function M.open_projects()
                 key = "n",
                 fn = function()
                     local selection = actions_state.get_selected_entry()
-                    require "dotnet.nuget".NugetManager(project_file(selection.value))
+                    require "dotnet.nuget.manager".open(project_file(selection.value))
                 end
             },
             {

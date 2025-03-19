@@ -1,7 +1,8 @@
 local M = {}
 
-local curl = require "plenary.curl"
+-- TOOD: Learn how to properly use the NuGet API
 local uri = "https://api-v2v3search-0.nuget.org"
+local curl = require "plenary.curl"
 
 -- Function to search NuGet packages
 function M.query(query, take)
