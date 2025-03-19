@@ -67,9 +67,18 @@ local function open_proj(file)
         col = view_c,
     })
 
+    -- setups the different buffers
     vim.api.nvim_buf_set_lines(header_bufnr, 0, -1, false, {
         "  (S)earch  |  (I)nstalled  |  (U)pdate"
     })
+
+    vim.api.nvim_buf_set_option(search_bufnr, "buftype", "nofile")
+    vim.api.nvim_buf_set_option(search_bufnr, "modifiable", true)
+    vim.api.nvim_buf_set_keymap(search_bufnr, 'i', '<CR>', '<NOP>', { noremap = true, silent = true })
+    vim.api.nvim_buf_set_keymap(search_bufnr, 'n', 'o', '<NOP>', { noremap = true, silent = true })
+    vim.api.nvim_buf_set_keymap(search_bufnr, 'n', 'O', '<NOP>', { noremap = true, silent = true })
+    vim.api.nvim_buf_set_keymap(search_bufnr, 'n', 'p', '<NOP>', { noremap = true, silent = true })
+    vim.api.nvim_buf_set_keymap(search_bufnr, 'n', 'P', '<NOP>', { noremap = true, silent = true })
 
     local win_enter_cmd
     local win_close_cmd
@@ -119,27 +128,43 @@ local function open_proj(file)
     })
 
     local packages = {}
+    local debounce_timer = nil
     search_cmd = vim.api.nvim_create_autocmd("TextChangedI", {
         -- TODO: Change this to a more specific pattern
         pattern = "*",
         callback = function()
-            local query = vim.api.nvim_buf_get_lines(search_bufnr, 0, -1, false)
-            if not query or #query ~= 1  or query[1] == "" then
-                vim.api.nvim_buf_set_lines(results_bufnr, 0, -1, false, {})
-                vim.api.nvim_buf_set_lines(results_bufnr, -1, -1, false, {})
-                return
+            if debounce_timer then
+                vim.fn.timer_stop(debounce_timer)
             end
 
-            packages = api.query(query[1], results_h)
-            vim.api.nvim_buf_set_lines(results_bufnr, 0, -1, false, {})
-
-            if package and #packages > 0 then
-                for _, result in ipairs(packages) do
-                    vim.api.nvim_buf_set_lines(results_bufnr, -1, -1, false, { " " .. result.id })
+            debounce_timer = vim.fn.timer_start(500, function()
+                local search_val = vim.api.nvim_buf_get_lines(search_bufnr, 0, -1, false)
+                if not search_val or #search_val == 0 then
+                    vim.api.nvim_buf_set_lines(results_bufnr, 0, -1, false, {})
+                    vim.api.nvim_buf_set_lines(results_bufnr, -1, -1, false, {})
+                    return
                 end
-            else
-                vim.api.nvim_buf_set_lines(results_bufnr, -1, -1, false, {})
-            end
+
+                local query = string.match(search_val[1], "%S+") or ""
+                if not query or query == "" then
+                    vim.api.nvim_buf_set_lines(results_bufnr, 0, -1, false, {})
+                    vim.api.nvim_buf_set_lines(results_bufnr, -1, -1, false, {})
+                    return
+                end
+
+                print("Searching for: " .. query)
+                packages = api.query(query, results_h)
+                vim.api.nvim_buf_set_lines(results_bufnr, 0, -1, false, {})
+
+                if package and #packages > 0 then
+                    for _, result in ipairs(packages) do
+                        vim.api.nvim_buf_set_lines(results_bufnr, -1, -1, false, { " " .. result.id })
+                    end
+                else
+                    vim.api.nvim_buf_set_lines(results_bufnr, -1, -1, false, {})
+                end
+                debounce_timer = nil
+            end)
         end,
     })
 
