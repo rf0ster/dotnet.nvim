@@ -50,4 +50,44 @@ function M.center_win_height(h_perc, opts)
     return opts
 end
 
+-- given a single string, splits it into a table of strings
+-- based on the newline character. If you provide a bufnr,
+-- it will also calculate the width of the buffer and further
+-- split the string into lines based on the width of the buffer.
+-- given a single string, splits it into a table of strings
+-- based on the newline character. If you provide a bufnr,
+-- it will also calculate the width of the buffer and further
+-- split the string into lines based on the width of the buffer.
+function M.smart_split(str, width, pad_left, pad_right)
+    pad_left = pad_left or 0
+    pad_right = pad_right or 0
+    local padded_width = width - pad_left - pad_right
+
+    local function pad(s)
+        return string.rep(" ", pad_left) .. s .. string.rep(" ", pad_right)
+    end
+
+    local newline_splits = {}
+    for line in str:gmatch("[^\r\n]+") do
+        table.insert(newline_splits, line)
+    end
+
+    local lines = {}
+    for _, line in ipairs(newline_splits) do
+        if #line < padded_width then
+            table.insert(lines, pad(line))
+            goto continue
+        end
+
+        for i = 1, #line, padded_width do
+            local l = line:sub(i, i + padded_width - 1)
+            table.insert(lines, pad(l))
+        end
+
+        ::continue::
+    end
+
+    return lines
+end
+
 return M

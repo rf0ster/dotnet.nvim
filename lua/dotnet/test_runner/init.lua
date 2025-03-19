@@ -2,6 +2,7 @@ local M = {}
 
 local solution = require "dotnet.solution"
 local parser = require "dotnet.test_runner.parser"
+local utils = require "dotnet.utils"
 local cli = require "dotnet.cli"
 
 -- creates a namespace for the circle markers
@@ -359,8 +360,11 @@ local create_windows = function()
                 table.insert(output, " Output:")
                 table.insert(output, "   Message: " .. result.output.Message)
                 table.insert(output, "   Stack Trace:")
-                for line in result.output.StackTrace:gmatch("[^\r\n]+") do
-                    table.insert(output, "   " .. line)
+
+                local w = vim.api.nvim_win_get_width(M.win_results)
+                local smart_lines = utils.smart_split(result.output.StackTrace, w, 5, 1)
+                for _, line in ipairs(smart_lines) do
+                    table.insert(output, line)
                 end
             end
 

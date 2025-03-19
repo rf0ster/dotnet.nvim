@@ -202,17 +202,16 @@ local function open_proj(file)
             if not package then
                 vim.api.nvim_buf_set_lines(view_bufnr, 0, -1, false, {})
             else
-                local desc_lines = {}
-                for l in package.description:gmatch("[^\r\n]+") do
-                    table.insert(desc_lines, "  " .. l)
-                end
-
                 vim.api.nvim_buf_set_lines(view_bufnr, 0, -1, false, {
-                    "ID: " .. package.id,
-                    "Version: " .. package.version,
-                    "Description: "
+                    " ID: " .. package.id,
+                    " Version: " .. package.version,
+                    " Description: "
                 })
-                vim.api.nvim_buf_set_lines(view_bufnr, -1, -1, false, desc_lines)
+
+                -- get width of view window
+                local view_width = vim.api.nvim_win_get_width(view_win)
+                local smart_lines = utils.smart_split(package.description, view_width, 3, 2)
+                vim.api.nvim_buf_set_lines(view_bufnr, -1, -1, false, smart_lines)
             end
 
             vim.api.nvim_buf_set_option(view_bufnr, "modifiable", false)
