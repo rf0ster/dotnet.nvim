@@ -2,6 +2,7 @@ local M = {}
 
 local utils = require "dotnet.utils"
 local api = require "dotnet.nuget.api"
+local cli = require "dotnet.cli"
 
 local function open_proj(file)
     -- NugetManager window dimensions
@@ -243,6 +244,31 @@ local function open_proj(file)
     -- keymaps for results
     vim.keymap.set("n", "gk", set_focus_search, { noremap = true, silent = true, buffer = results_bufnr })
     vim.keymap.set("n", "gl", set_focus_view, { noremap = true, silent = true, buffer = results_bufnr })
+    vim.keymap.set("n", "i", function()
+        local line = vim.api.nvim_get_current_line()
+        if not line or line == "" then
+            return
+        end
+
+        local id = string.match(line, "%S+")
+        if not id or id == "" then
+            return
+        end
+
+        local package = nil
+        for _, result in ipairs(packages) do
+            if result.id == id then
+                package = result
+                break
+            end
+        end
+
+        if not package then
+            return
+        end
+
+        cli.add_package(file, package.id, package.version)
+    end, { noremap = true, silent = true, buffer = results_bufnr })
 
     -- keymaps for view
     vim.keymap.set("n", "gk", set_focus_header, { noremap = true, silent = true, buffer = view_bufnr })
