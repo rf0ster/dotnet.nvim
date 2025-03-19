@@ -141,32 +141,37 @@ local function open_proj(file)
             end
 
             debounce_timer = vim.fn.timer_start(500, function()
+                local function clear()
+                    vim.api.nvim_buf_set_option(results_bufnr, "modifiable", true)
+                    vim.api.nvim_buf_set_lines(results_bufnr, 0, -1, false, {})
+                    vim.api.nvim_buf_set_option(results_bufnr, "modifiable", false)
+                end
+
                 local search_val = vim.api.nvim_buf_get_lines(search_bufnr, 0, -1, false)
                 if not search_val or #search_val == 0 then
-                    vim.api.nvim_buf_set_lines(results_bufnr, 0, -1, false, {})
-                    vim.api.nvim_buf_set_lines(results_bufnr, -1, -1, false, {})
+                    clear()
                     return
                 end
 
                 local query = string.match(search_val[1], "%S+") or ""
                 if not query or query == "" then
-                    vim.api.nvim_buf_set_lines(results_bufnr, 0, -1, false, {})
-                    vim.api.nvim_buf_set_lines(results_bufnr, -1, -1, false, {})
+                    clear()
                     return
                 end
 
                 packages = api.query(query, results_h)
-                vim.api.nvim_buf_set_option(results_bufnr, "modifiable", true)
-                vim.api.nvim_buf_set_lines(results_bufnr, 0, -1, false, {})
-
+                local pkg_list = {}
                 if package and #packages > 0 then
                     for _, result in ipairs(packages) do
-                        vim.api.nvim_buf_set_lines(results_bufnr, -1, -1, false, { " " .. result.id })
+                        table.insert(pkg_list, " " .. result.id)
                     end
-                else
-                    vim.api.nvim_buf_set_lines(results_bufnr, -1, -1, false, {})
                 end
+
+                vim.api.nvim_buf_set_option(results_bufnr, "modifiable", true)
+                vim.api.nvim_buf_set_lines(results_bufnr, 0, -1, false, {})
+                vim.api.nvim_buf_set_lines(results_bufnr, 0, 0, false, pkg_list)
                 vim.api.nvim_buf_set_option(results_bufnr, "modifiable", false)
+                vim.api.nvim_win_set_cursor(results_win, { 1, 0 })
                 debounce_timer = nil
             end)
         end,
