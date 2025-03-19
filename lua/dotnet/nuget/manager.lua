@@ -1,52 +1,92 @@
 local M = {}
 
 local utils = require "dotnet.utils"
+local api = require "dotnet.nuget.api"
 
 local function open_proj(file)
-    local mgr_win_opts = utils.center_win_width(.8, {
-        height = 3,
-        row = 5,
-    })
-    local mgr_buf, mgr_win = utils.float_win("NuGet Manager", mgr_win_opts)
-    vim.api.nvim_buf_set_lines(mgr_buf, 0, -1, false, {
-        " Project: " .. file,
-        "",
-        " Search  --  Installed  --  Update"
+    -- NugetManager window dimensions
+    -- ***************************
+    -- * header                  *
+    -- ***************************
+    -- * search     * view       *
+    -- **************            *
+    -- * results    *            *
+    -- *            *            *
+    -- *            *            *
+    -- ***************************
+
+    -- Calculate window dimensions
+    local win_dim = utils.center_win(0.8, 0.8)
+    local w_half = math.floor(win_dim.width / 2)
+
+    local header_h = 1
+    local header_w = win_dim.width
+    local header_r = win_dim.row
+    local header_c = win_dim.col
+
+    local search_h = 1
+    local search_w = w_half - 2
+    local search_r = header_r + header_h + 2
+    local search_c = win_dim.col
+
+    local results_h = win_dim.height - header_h - search_h - 4
+    local results_w = w_half - 2
+    local results_r = search_r + search_h + 2
+    local results_c = win_dim.col
+
+    local view_h = win_dim.height - header_h - 2
+    local view_w = w_half
+    local view_r = header_r + header_h + 2
+    local view_c = win_dim.col + w_half
+
+    local header_bufnr, header_win = utils.float_win("NuGet Manager  " .. file, {
+        width = header_w,
+        height = header_h,
+        row = header_r,
+        col = header_c,
     })
 
-    -- get x, y, width, height of window
-    local mgr_win_config = vim.api.nvim_win_get_config(mgr_win)
-    local r, c = mgr_win_config.row, mgr_win_config.col
-    local w, h = mgr_win_config.width, mgr_win_config.height
-
-    local half_w = math.floor(w / 2)
-    local sub_r = r + h + 2
     local search_bufnr, search_win = utils.float_win("Search", {
-        width = half_w - 2,
-        height = 3,
-        row = sub_r,
-        col = c
+        width = search_w,
+        height = search_h,
+        row = search_r,
+        col = search_c,
     })
 
     local results_bufnr, results_win = utils.float_win("Results", {
-        width = half_w,
-        height = 3,
-        row = sub_r,
-        col = c + half_w
+        width = results_w,
+        height = results_h,
+        row = results_r,
+        col = results_c,
+    })
+
+    local view_bufnr, view_win = utils.float_win("View", {
+        width = view_w,
+        height = view_h,
+        row = view_r,
+        col = view_c,
+    })
+
+    vim.api.nvim_buf_set_lines(header_bufnr, 0, -1, false, {
+        "  (S)earch  |  (I)nstalled  |  (U)pdate"
     })
 
     local win_enter_cmd
     local win_close_cmd
+    local search_cmd
     local function close_all()
         -- close all windows if they exist
+        if vim.api.nvim_win_is_valid(header_win) then
+            vim.api.nvim_win_close(header_win, true)
+        end
         if vim.api.nvim_win_is_valid(search_win) then
             vim.api.nvim_win_close(search_win, true)
         end
         if vim.api.nvim_win_is_valid(results_win) then
             vim.api.nvim_win_close(results_win, true)
         end
-        if vim.api.nvim_win_is_valid(mgr_win) then
-            vim.api.nvim_win_close(mgr_win, true)
+        if vim.api.nvim_win_is_valid(view_win) then
+            vim.api.nvim_win_close(view_win, true)
         end
 
         -- remove cmds from nvim_create_autocmd
@@ -56,43 +96,89 @@ local function open_proj(file)
         if win_close_cmd then
             vim.api.nvim_del_autocmd(win_close_cmd)
         end
+        if search_cmd then
+            vim.api.nvim_del_autocmd(search_cmd)
+        end
     end
 
     win_enter_cmd = vim.api.nvim_create_autocmd("WinEnter", {
         callback = function()
             -- get focused window and bufnr
             local win_id = vim.api.nvim_get_current_win()
-           if win_id ~= search_win and win_id ~= results_win and win_id ~= mgr_win then
+            if win_id ~= search_win and win_id ~= view_win and win_id ~= header_win and win_id ~= results_win then
                 close_all()
             end
 
         end,
     })
     win_close_cmd = vim.api.nvim_create_autocmd("WinClosed", {
-        pattern = mgr_win .. "," .. search_win .. "," .. results_win,
+        pattern = header_win .. "," .. search_win .. "," .. results_win .. "," .. view_win,
         callback = function()
             close_all()
         end,
     })
+
+    local packages = {}
+    search_cmd = vim.api.nvim_create_autocmd("TextChangedI", {
+        -- TODO: Change this to a more specific pattern
+        pattern = "*",
+        callback = function()
+            local query = vim.api.nvim_buf_get_lines(search_bufnr, 0, -1, false)
+            if not query or #query ~= 1  or query[1] == "" then
+                vim.api.nvim_buf_set_lines(results_bufnr, 0, -1, false, {})
+                vim.api.nvim_buf_set_lines(results_bufnr, -1, -1, false, {})
+                return
+            end
+
+            packages = api.query(query[1], results_h)
+            vim.api.nvim_buf_set_lines(results_bufnr, 0, -1, false, {})
+
+            if package and #packages > 0 then
+                for _, result in ipairs(packages) do
+                    vim.api.nvim_buf_set_lines(results_bufnr, -1, -1, false, { " " .. result.id })
+                end
+            else
+                vim.api.nvim_buf_set_lines(results_bufnr, -1, -1, false, {})
+            end
+        end,
+    })
+
     -- set keymap to close each window on <esc>
     vim.api.nvim_buf_set_keymap(search_bufnr, "n", "<esc>", ":q!<cr>", { noremap = true, silent = true })
+    vim.api.nvim_buf_set_keymap(view_bufnr, "n", "<esc>", ":q!<cr>", { noremap = true, silent = true })
+    vim.api.nvim_buf_set_keymap(header_bufnr, "n", "<esc>", ":q!<cr>", { noremap = true, silent = true })
     vim.api.nvim_buf_set_keymap(results_bufnr, "n", "<esc>", ":q!<cr>", { noremap = true, silent = true })
-    vim.api.nvim_buf_set_keymap(mgr_buf, "n", "<esc>", ":q!<cr>", { noremap = true, silent = true })
 
-    local function set_focus_to_mgr()
-        vim.api.nvim_set_current_win(mgr_win)
+    local function set_focus_header()
+        vim.api.nvim_set_current_win(header_win)
     end
-    local function set_focus_to_search()
+    local function set_focus_search()
         vim.api.nvim_set_current_win(search_win)
     end
-    local function set_focus_to_results()
+    local function set_focus_results()
         vim.api.nvim_set_current_win(results_win)
     end
-    vim.keymap.set("n", "gk", set_focus_to_mgr, { noremap = true, silent = true, buffer = search_bufnr })
-    vim.keymap.set("n", "gk", set_focus_to_mgr, { noremap = true, silent = true, buffer = results_bufnr })
-    vim.keymap.set("n", "gj", set_focus_to_search, { noremap = true, silent = true, buffer = mgr_buf })
-    vim.keymap.set("n", "gh", set_focus_to_search, { noremap = true, silent = true, buffer = results_bufnr })
-    vim.keymap.set("n", "gl", set_focus_to_results, { noremap = true, silent = true, buffer = search_bufnr })
+    local function set_focus_view()
+        vim.api.nvim_set_current_win(view_win)
+    end
+
+    -- keymaps for header
+    vim.keymap.set("n", "gj", set_focus_search, { noremap = true, silent = true, buffer = header_bufnr })
+
+    -- keymaps for search
+    vim.keymap.set("n", "gk", set_focus_header, { noremap = true, silent = true, buffer = search_bufnr })
+    vim.keymap.set("n", "gj", set_focus_results, { noremap = true, silent = true, buffer = search_bufnr })
+    vim.keymap.set("n", "gl", set_focus_view, { noremap = true, silent = true, buffer = search_bufnr })
+
+    -- keymaps for results
+    vim.keymap.set("n", "gk", set_focus_search, { noremap = true, silent = true, buffer = results_bufnr })
+    vim.keymap.set("n", "gl", set_focus_view, { noremap = true, silent = true, buffer = results_bufnr })
+
+    -- keymaps for view
+    vim.keymap.set("n", "gk", set_focus_header, { noremap = true, silent = true, buffer = view_bufnr })
+    vim.keymap.set("n", "gh", set_focus_search, { noremap = true, silent = true, buffer = view_bufnr })
+
+    vim.api.nvim_set_current_win(search_win)
 end
 
 local function open_sln(file)
