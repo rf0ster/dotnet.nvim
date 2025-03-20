@@ -137,4 +137,54 @@ function M.tie_wins(win_ids)
     })
 end
 
+function M.create_knot(win_ids)
+    local bufnrs = {}
+    for _, win_id in ipairs(win_ids) do
+        local bufnr = vim.api.nvim_win_get_buf(win_id)
+        vim.api.nvim_buf_set_keymap(bufnr, "n", "<esc>", ":q!<cr>", { noremap = true, silent = true })
+        table.insert(bufnrs, bufnr)
+    end
+
+    local autocmds = {}
+    local function untie()
+        for _, autocmd in ipairs(autocmds) do
+            vim.api.nvim_del_autocmd(autocmd)
+        end
+    end
+
+    local function close_all()
+        for _, bufnr in ipairs(bufnrs) do
+            if vim.api.nvim_buf_is_valid(bufnr) then
+                vim.api.nvim_buf_delete(bufnr, { force = true })
+            end
+        end
+
+        for _, win in ipairs(win_ids) do
+            if vim.api.nvim_win_is_valid(win) then
+                vim.api.nvim_win_close(win, true)
+            end
+        end
+        untie()
+    end
+
+    local pattern = table.concat(win_ids, ",")
+    table.insert(autocmds, vim.api.nvim_create_autocmd("WinClosed", {
+        pattern = pattern,
+        callback = function()
+            close_all()
+        end
+    }))
+    table.insert(autocmds, vim.api.nvim_create_autocmd("WinEnter", {
+        pattern = "*",
+        callback = function()
+            local current_win = vim.api.nvim_get_current_win()
+            if not vim.tbl_contains(win_ids, current_win) then
+                close_all()
+            end
+        end
+    }))
+
+    return { win_ids = win_ids, untie = untie }
+end
+
 return M

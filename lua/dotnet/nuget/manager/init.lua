@@ -39,27 +39,30 @@ function M.open_browse_tab(proj_file)
     -- * search     * view       *
     -- **************            *
     -- * packages   **************
-    -- *            * install   *
+    -- *            * install    *
     -- *            *            *
+    -- ***************************
+    -- * output                  *
     -- ***************************
 
     -- Create search prompt dimensions
     local search_h = 1
     local search_w = math.floor(M.mgr_dim.width / 2) - 2
     local search_r = M.header_dim.row + M.header_dim.height + 2
-    local search_c = M.header_dim.col
+    local search_c = M.mgr_dim.col
 
     -- Create packages picker
     local pkgs_h = M.mgr_dim.height - M.header_dim.height - search_h - 6
     local pkgs_w = search_w
     local pkgs_r = search_r + search_h + 2
-    local pkgs_c = search_c
+    local pkgs_c = M.mgr_dim.col
 
     -- Create preview window for a single package
     local preview_h = M.mgr_dim.height - M.header_dim.height - 4
-    local preview_w = search_w
+    local preview_w = search_w + 2
     local preview_r = search_r
     local preview_c = M.mgr_dim.col + search_w + 2
+
 
     -- create package preview window
     local preview_bufnr, preview_win_id = utils.float_win("Preview", {
@@ -132,6 +135,9 @@ function M.open_browse_tab(proj_file)
         end
     })
 
+    -- tie windows together on close
+    local knot = utils.create_knot({ M.header_win_id, search.win_id, packages.win_id, preview_win_id })
+
     -- navigation keymaps for header
     local header_opts = { buffer = M.header_bufnr }
     vim.keymap.set("n", "gj", function() vim.api.nvim_set_current_win(search.win_id) end, header_opts)
@@ -152,11 +158,11 @@ function M.open_browse_tab(proj_file)
     vim.keymap.set("n", "gk", function() vim.api.nvim_set_current_win(M.header_win_id) end, preview_opts)
     vim.keymap.set("n", "gh", function() vim.api.nvim_set_current_win(search.win_id) end, preview_opts)
 
-    -- tie windows together on close
-    utils.tie_wins({ M.header_win_id, search.win_id, packages.win_id, preview_win_id })
-
     -- set cursor to search
     vim.api.nvim_set_current_win(search.win_id)
+
+    -- set mode to insert
+    vim.api.nvim_command("startinsert")
 end
 
 return M
