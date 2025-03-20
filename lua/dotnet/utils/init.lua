@@ -50,7 +50,7 @@ function M.center_win_height(h_perc, opts)
     return opts
 end
 
--- given a single string, splits it into a table of strings
+-- Given a single string, splits it into a table of strings
 -- based on the newline character. If you provide a bufnr,
 -- it will also calculate the width of the buffer and further
 -- split the string into lines based on the width of the buffer.
@@ -88,6 +88,53 @@ function M.smart_split(str, width, pad_left, pad_right)
     end
 
     return lines
+end
+
+-- Given a table of window ids, it will set autocmds to close all
+-- the given windows if any of them close. It will also close all
+-- the windows if the user switches to a window that is not in the
+-- list of window ids.
+function M.tie_wins(win_ids)
+    local buffers = {}
+    for _, win_id in ipairs(win_ids) do
+        local bufnr = vim.api.nvim_win_get_buf(win_id)
+        table.insert(buffers, bufnr)
+        vim.api.nvim_buf_set_keymap(bufnr, "n", "<esc>", ":q!<cr>", { noremap = true, silent = true })
+    end
+
+    local cmd
+    local function close_all()
+        for _, bufnr in ipairs(buffers) do
+            vim.api.nvim_clear_autocmds({ buffer = bufnr })
+        end
+        if cmd then
+            vim.api.nvim_del_autocmd(cmd)
+        end
+
+
+        for _, win_id in ipairs(win_ids) do
+            if vim.api.nvim_win_is_valid(win_id) then
+                vim.api.nvim_win_close(win_id, true)
+            end
+        end
+    end
+
+    for _, bufnr in ipairs(buffers) do
+        vim.api.nvim_create_autocmd("WinClosed", {
+            buffer = bufnr,
+            callback = close_all,
+        })
+    end
+
+    cmd = vim.api.nvim_create_autocmd("WinEnter", {
+        pattern = "*",
+        callback = function()
+            local win_id = vim.api.nvim_get_current_win()
+            if not vim.tbl_contains(win_ids, win_id) then
+                close_all()
+            end
+        end
+    })
 end
 
 return M
