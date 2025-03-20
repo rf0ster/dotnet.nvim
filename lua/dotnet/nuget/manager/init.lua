@@ -4,6 +4,7 @@ local utils = require "dotnet.utils"
 local prompt = require "dotnet.nuget.prompt"
 local picker = require "dotnet.nuget.picker"
 local api = require "dotnet.nuget.api"
+local cli = require "dotnet.cli"
 
 function M.open(proj_file)
     M.mgr_dim = utils.center_win(0.8, 0.8)
@@ -27,10 +28,10 @@ function M.open(proj_file)
     M.header_bufnr = header_bufnr
     M.header_win_id = header_win_id
 
-    M.open_browse_tab()
+    M.open_browse_tab(proj_file)
 end
 
-function M.open_browse_tab()
+function M.open_browse_tab(proj_file)
     -- NugetManager browser layout
     -- ***************************
     -- * header                  *
@@ -82,6 +83,9 @@ function M.open_browse_tab()
         display = function(pkg)
             return pkg.id
         end,
+        keymaps = {
+            { key = "i", fn = function(pkg) cli.add_package(proj_file, pkg.id, pkg.version) end },
+        },
         on_change = function(pkg)
             vim.api.nvim_buf_set_option(preview_bufnr, "modifiable", true)
             vim.api.nvim_buf_set_lines(preview_bufnr, 0, -1, false, {})
@@ -121,29 +125,29 @@ function M.open_browse_tab()
             packages.set_values(pkg_list)
         end
     })
-    -- tie windows together on close
-    utils.tie_wins({ M.header_win_id, search.win_id, packages.win_id, preview_win_id })
 
-    -- set window navigation keymaps
-    -- keymaps for header
+    -- navigation keymaps for header
     local header_opts = { buffer = M.header_bufnr }
     vim.keymap.set("n", "gj", function() vim.api.nvim_set_current_win(search.win_id) end, header_opts)
 
-    -- keymaps for search
+    -- navigation keymaps for search
     local search_opts = { buffer = search.bufnr }
     vim.keymap.set("n", "gk", function() vim.api.nvim_set_current_win(M.header_win_id) end, search_opts)
     vim.keymap.set("n", "gj", function() vim.api.nvim_set_current_win(packages.win_id) end, search_opts)
     vim.keymap.set("n", "gl", function() vim.api.nvim_set_current_win(preview_win_id) end, search_opts)
 
-    -- keymaps for results
+    -- navigation keymaps for results
     local packages_opts = { buffer = packages.bufnr }
     vim.keymap.set("n", "gk", function() vim.api.nvim_set_current_win(search.win_id) end, packages_opts)
     vim.keymap.set("n", "gl", function() vim.api.nvim_set_current_win(preview_win_id) end, packages_opts)
 
-    -- keymaps for preview
+    -- navigation keymaps for preview
     local preview_opts = { buffer = preview_bufnr }
     vim.keymap.set("n", "gk", function() vim.api.nvim_set_current_win(M.header_win_id) end, preview_opts)
     vim.keymap.set("n", "gh", function() vim.api.nvim_set_current_win(search.win_id) end, preview_opts)
+
+    -- tie windows together on close
+    utils.tie_wins({ M.header_win_id, search.win_id, packages.win_id, preview_win_id })
 
     -- set cursor to search
     vim.api.nvim_set_current_win(search.win_id)

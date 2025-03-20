@@ -7,6 +7,7 @@ function M.create(opts)
         title = "Picker",
         values = {},
         win_opts = utils.center_win(0.5, 0.5),
+        keymaps = {},
         on_change = function(val) print(val) end,
         display = function(val) return val end,
     }
@@ -21,15 +22,28 @@ function M.create(opts)
     vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
     vim.api.nvim_buf_set_option(bufnr, "cursorline", true)
 
+    -- get the selected value
+    -- assumes the selected row is expected table index
     local values = {}
+    local get_selected_value = function()
+        local row = vim.api.nvim_win_get_cursor(win_id)[1]
+        if row <= #values then
+            return values[row]
+        end
+        return nil
+    end
+
+    -- set keymaps
+    for _, km in ipairs(defaults.keymaps) do
+        vim.keymap.set("n", km.key, function()
+            km.fn(get_selected_value())
+        end, { buffer = bufnr })
+    end
+
     vim.api.nvim_create_autocmd("CursorMoved", {
         buffer = bufnr,
         callback = function()
-            -- Assumes that the row number is the index of the value in the values table
-            local row = vim.api.nvim_win_get_cursor(win_id)[1]
-            if row <= #values then
-                defaults.on_change(values[row])
-            end
+            defaults.on_change(get_selected_value())
         end
     })
 
