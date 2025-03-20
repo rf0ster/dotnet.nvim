@@ -63,7 +63,6 @@ function M.open_browse_tab(proj_file)
     local preview_r = search_r
     local preview_c = M.mgr_dim.col + search_w + 2
 
-
     -- create package preview window
     local preview_bufnr, preview_win_id = utils.float_win("Preview", {
         height = preview_h,
@@ -135,6 +134,52 @@ function M.open_browse_tab(proj_file)
         end
     })
 
+    -- modify the dimensions of the packages and preview windows
+    local function modify_window_heights()
+        vim.api.nvim_win_set_height(packages.win_id, pkgs_h)
+        vim.api.nvim_win_set_height(preview_win_id, preview_h)
+    end
+
+    -- create ouptut window
+    local output_bufnr
+    local output_win_id
+    local function toggle_output()
+        if not output_win_id then
+            knot.untie()
+
+            local output_h = 4
+            pkgs_h = M.mgr_dim.height - M.header_dim.height - search_h - output_h - 8
+            preview_h = M.mgr_dim.height - M.header_dim.height - output_h - 6
+            modify_window_heights()
+
+            local output_w = M.mgr_dim.width
+            local output_c = M.mgr_dim.col
+            local output_r = pkgs_r + pkgs_h + 2
+            output_bufnr, output_win_id = utils.float_win("Output", {
+                height = output_h,
+                width = output_w,
+                row = output_r,
+                col = output_c,
+            })
+
+
+            vim.keymap.set("n", "<leader>o", function() toggle_output() end, { buffer = output_bufnr })
+            knot = utils.create_knot({ M.header_win_id, search.win_id, packages.win_id, preview_win_id, output_win_id })
+        else
+            knot.untie()
+
+            pkgs_h = M.mgr_dim.height - M.header_dim.height - search_h - 6
+            preview_h = M.mgr_dim.height - M.header_dim.height - 4
+            modify_window_heights()
+
+            vim.api.nvim_win_close(output_win_id, true)
+            output_win_id = nil
+            output_bufnr = nil
+
+            knot = utils.create_knot({ M.header_win_id, search.win_id, packages.win_id, preview_win_id })
+        end
+    end
+
     -- tie windows together on close
     local knot = utils.create_knot({ M.header_win_id, search.win_id, packages.win_id, preview_win_id })
 
@@ -157,6 +202,13 @@ function M.open_browse_tab(proj_file)
     local preview_opts = { buffer = preview_bufnr }
     vim.keymap.set("n", "gk", function() vim.api.nvim_set_current_win(M.header_win_id) end, preview_opts)
     vim.keymap.set("n", "gh", function() vim.api.nvim_set_current_win(search.win_id) end, preview_opts)
+
+    -- keymap to toggle output for all buffers
+    vim.keymap.set("n", "<leader>o", function() toggle_output() end, { buffer = M.header_bufnr })
+    vim.keymap.set("n", "<leader>o", function() toggle_output() end, { buffer = search.bufnr })
+    vim.keymap.set("n", "<leader>o", function() toggle_output() end, { buffer = packages.bufnr })
+    vim.keymap.set("n", "<leader>o", function() toggle_output() end, { buffer = preview_bufnr })
+
 
     -- set cursor to search
     vim.api.nvim_set_current_win(search.win_id)
