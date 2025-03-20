@@ -120,8 +120,14 @@ function M.open_browse_tab(proj_file)
                 return
             end
 
+            local query = string.match(val, "%S+")
+            if not query then
+                packages.set_values({})
+                return
+            end
+
             local take = 2 * pkgs_h
-            local pkg_list = api.query(val, take) or {}
+            local pkg_list = api.query(query, take) or {}
             packages.set_values(pkg_list)
         end
     })

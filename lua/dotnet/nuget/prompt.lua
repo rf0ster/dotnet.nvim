@@ -18,7 +18,7 @@ function M.create(opts)
     local defaults = {
         title = "Prompt",
         win_opts = win_opts,
-        debounce = 500,
+        debounce = 200,
         on_change = function(_) end,
     }
 
