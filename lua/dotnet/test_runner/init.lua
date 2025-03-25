@@ -23,11 +23,11 @@ local function get_test_info()
     local bufnr = vim.api.nvim_get_current_buf()
     if bufnr ~= M.bufnr_tests then
         return {
+            sln_name = nil,
             proj_name = nil,
             test_name = nil
         }
     end
-
 
     local trim = function(s)
         if s == nil then
@@ -43,12 +43,27 @@ local function get_test_info()
         return s:match("%.csproj$") ~= nil
     end
 
+    local is_sln = function(s)
+        if s == nil then
+            return false
+        end
+        return s:match("%.sln$") ~= nil
+    end
+
     local row = vim.api.nvim_win_get_cursor(0)[1] -- Get the current row
     local line = vim.api.nvim_buf_get_lines(0, row - 1, row, false)[1]  -- Fetch the line
     line = trim(line)
 
+    if is_sln(line) then
+        return {
+            sln_name = line,
+            proj_name = nil,
+            test_name = nil
+        }
+    end
     if is_proj(line) then
         return {
+            sln_name = nil,
             proj_name = line,
             test_name = nil
         }
@@ -66,6 +81,7 @@ local function get_test_info()
     end
 
     return {
+        sln_name = nil,
         proj_name = proj_file,
         test_name = test_name
     }
@@ -84,6 +100,10 @@ local function load_tests()
         return
     end
 
+    M.sln_outcome = {
+        result = { "No Results" },
+        sln_name = sln.name,
+    }
     M.tests = {}
     for _, project in ipairs(projects) do
         local output = cli.test_list_all(project.file)
@@ -124,10 +144,13 @@ local function load_tests()
 end
 
 local load_results = function()
+    local found_nil = false
+    local found_failed = false
     for _, test_project in pairs(M.tests) do
         local results = parser.parse_trx_file(test_project.results_file)
         if results == nil then
             test_project.outcome = nil
+            found_nil = true
             for _, test in pairs(test_project.tests) do
                 test.result = { outcome = nil }
             end
@@ -136,12 +159,22 @@ local load_results = function()
             for _, test_result in pairs(results) do
                 test_project.tests[test_result.testName].result = test_result
                 if test_result.outcome == "Failed" then
+                    found_failed = true
                     res = "Failed"
                 end
             end
             test_project.outcome = res
         end
     end
+
+    if found_failed then
+        M.sln_outcome.result = "Failed"
+    elseif found_nil then
+        M.sln_outcome.result = nil
+    else
+        M.sln_outcome.result = "Passed"
+    end
+
 end
 
 -- Pretty prints the tests to the buffer with cool circle markers
@@ -203,11 +236,12 @@ local write_tests_to_buffer = function()
     end
 
     -- Write the tests to the buffer
+    write_test(M.sln_outcome.sln_name, 2, get_highlight(M.sln_outcome.result))
     for key, val in pairs(M.tests) do
-        write_test(key, 2, get_highlight(val.outcome))
+        write_test(key, 4, get_highlight(val.outcome))
         if val.tests ~= nil then
             for k, v in pairs(val.tests) do
-                write_test(k, 4, get_highlight(v.result.outcome))
+                write_test(k, 6, get_highlight(v.result.outcome))
             end
         end
     end
@@ -217,15 +251,17 @@ end
 
 local run_test = function()
     local info = get_test_info()
-    local p = info.proj_name or ""
-    local t = info.test_name or ""
+    print(vim.inspect(info))
+    local s = info.sln_name
+    local p = info.proj_name
+    local t = info.test_name
 
-    if p == "" then
+    if not p and not s then
         return
     end
 
     local filter = ""
-    if t ~= "" then
+    if t then
         filter = " --filter " .. t
     end
 
@@ -244,7 +280,11 @@ local run_test = function()
     set_buf_modifiable(M.bufnr_output, true)
     vim.api.nvim_buf_set_lines(M.bufnr_output, 0, -1, false, {})
 
-    vim.fn.jobstart("dotnet test " .. p .. filter .. " --logger \"trx;LogFileName=nvim_dotnet_results.trx\"", {
+    local target = p or s
+    print(target)
+    local cmd ="dotnet test " .. target .. filter .. " --logger \"trx;LogFileName=nvim_dotnet_results.trx\""
+    print(cmd)
+    vim.fn.jobstart(cmd, {
         on_stdout = on_output,
         on_stderr = on_output,
         on_exit = function()
@@ -302,32 +342,7 @@ local create_windows = function()
         border = "rounded",
     })
 
-    -- Close all windows when either buffer is closed.
-    local close_windows = function()
-        if vim.api.nvim_win_is_valid(M.win_tests) then
-            vim.api.nvim_win_close(M.win_tests, true)
-        end
-        if vim.api.nvim_win_is_valid(M.win_results) then
-            vim.api.nvim_win_close(M.win_results, true)
-        end
-        if vim.api.nvim_win_is_valid(M.win_output) then
-            vim.api.nvim_win_close(M.win_output, true)
-        end
-    end
-
-    local evts = {"BufWipeout", "BufWinLeave", "WinClosed"}
-    vim.api.nvim_create_autocmd(evts, {
-        buffer = M.bufnr_tests,
-        callback = close_windows
-    })
-    vim.api.nvim_create_autocmd(evts, {
-        buffer = M.bufnr_results,
-        callback = close_windows
-    })
-    vim.api.nvim_create_autocmd(evts, {
-        buffer = M.bufnr_output,
-        callback = close_windows
-    })
+    utils.create_knot({M.win_tests, M.win_results, M.win_output})
 
     -- Creates autocmd that if the cursor in the bufrnr_tests is moved, the results are updated
     vim.api.nvim_create_autocmd("CursorMoved", {
