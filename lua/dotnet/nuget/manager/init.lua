@@ -143,6 +143,7 @@ function M.open_browse_tab(proj_file)
     -- create ouptut window
     local output_bufnr
     local output_win_id
+    local knot
     local function toggle_output()
         if not output_win_id then
             knot.untie()
@@ -181,7 +182,7 @@ function M.open_browse_tab(proj_file)
     end
 
     -- tie windows together on close
-    local knot = utils.create_knot({ M.header_win_id, search.win_id, packages.win_id, preview_win_id })
+    knot = utils.create_knot({ M.header_win_id, search.win_id, packages.win_id, preview_win_id })
 
     -- navigation keymaps for header
     local header_opts = { buffer = M.header_bufnr }
