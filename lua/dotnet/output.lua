@@ -9,22 +9,24 @@ local M = {
 
 -- Removes the current output window from vim.
 function M.clear()
-    if M.win_id then
-        pcall(vim.api.nvim_win_close, M.win_id, true)
-        M.win_id = nil
+    if M.win_id and vim.api.nvim_win_is_valid(M.win_id) then
+        vim.api.nvim_win_close(M.win_id, true)
     end
+
+    M.win_id = nil
 end
 
 -- Runs a command and displays the output in a new window.
 -- param cmd: The command to run.
 function M.run_cmd(cmd)
+    M.clear()
+
 	local width = math.floor(vim.o.columns * 0.8)
 	local height = math.floor(vim.o.lines * 0.8)
 	local row = math.floor((vim.o.lines - height) / 2)
 	local col = math.floor((vim.o.columns - width) / 2)
 
     local bufnr = vim.api.nvim_create_buf(false, true)
-
     local win = vim.api.nvim_open_win(bufnr, true, {
         relative = "editor",
         width = width,
@@ -35,13 +37,13 @@ function M.run_cmd(cmd)
         border = "double",
         title = "Output - " .. cmd,
     })
+    print("Output win id: " .. win)
 
     vim.wo[win].wrap = false
     vim.wo[win].cursorline = false
     vim.wo[win].cursorcolumn = false
     vim.wo[win].statusline = "Output"
     vim.wo[win].wrap = false
-    M.clear()
     M.win_id = win
 
     local function on_output(_, data, _)

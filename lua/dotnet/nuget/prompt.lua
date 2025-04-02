@@ -1,6 +1,6 @@
 local M = {}
 
--- Why create a custom picker?
+-- Why create a custom prompt/picker?
 -- I wanted to originally resuse the telescope picker, but there
 -- were some limitations about how and when the picker was rendered
 -- that caused problems for how I need the nuget manager to work.

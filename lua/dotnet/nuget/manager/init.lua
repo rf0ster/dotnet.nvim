@@ -145,6 +145,7 @@ function M.open_browse_tab(proj_file)
     local output_win_id
     local knot
     local function toggle_output()
+        print("toggling")
         if not output_win_id then
             knot.untie()
 
@@ -205,11 +206,11 @@ function M.open_browse_tab(proj_file)
     vim.keymap.set("n", "gh", function() vim.api.nvim_set_current_win(search.win_id) end, preview_opts)
 
     -- keymap to toggle output for all buffers
+    print("Setting keymaps")
     vim.keymap.set("n", "<leader>o", function() toggle_output() end, { buffer = M.header_bufnr })
     vim.keymap.set("n", "<leader>o", function() toggle_output() end, { buffer = search.bufnr })
     vim.keymap.set("n", "<leader>o", function() toggle_output() end, { buffer = packages.bufnr })
     vim.keymap.set("n", "<leader>o", function() toggle_output() end, { buffer = preview_bufnr })
-
 
     -- set cursor to search
     vim.api.nvim_set_current_win(search.win_id)

@@ -1,3 +1,11 @@
+-- Why create a custom prompt/picker?
+-- I wanted to originally resuse the telescope picker, but there
+-- were some limitations about how and when the picker was rendered
+-- that caused problems for how I need the nuget manager to work.
+--
+-- I also wanted to separate the prompt and results display into
+-- separate components that can be used independently.
+
 local M = {}
 
 local utils = require "dotnet.utils"
