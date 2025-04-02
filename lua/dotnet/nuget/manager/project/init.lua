@@ -20,9 +20,10 @@ local tab_u = require "dotnet.nuget.manager.project.updates"
 local utils = require "dotnet.utils"
 
 -- opens the nuget manager
-function M.open()
+function M.open(proj_file)
     M.close()
-    M.header = header.open()
+    M.header = header.open(proj_file)
+    M.proj_file = proj_file
     M.open_tab(0)
 end
 
@@ -40,6 +41,7 @@ function M.close()
         end
     end
     M.header = nil
+    M.proj_file = nil
 end
 
 -- closes the current tab
@@ -66,7 +68,7 @@ end
 
 -- selects the tab to be opened
 function M.open_tab(opt)
-    if not M.header then
+    if not M.header or not M.proj_file then
         return
     end
 

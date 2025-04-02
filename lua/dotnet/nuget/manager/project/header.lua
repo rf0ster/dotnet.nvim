@@ -17,7 +17,7 @@ local M = {}
 local config = require "dotnet.nuget.config"
 local utils = require "dotnet.utils"
 
-function M.open()
+function M.open(proj_file)
     -- Calculate window dimensions
     local d = utils.get_centered_win_dims(
         config.opts.ui.width,
@@ -32,7 +32,7 @@ function M.open()
 
     local header_bufnr = vim.api.nvim_create_buf(false, true)
     local header_win = vim.api.nvim_open_win(header_bufnr, true, {
-        title = "NugetManager",
+        title = "NugetManager  -  " .. proj_file,
         relative = "editor",
         style = config.opts.ui.style,
         border = config.opts.ui.border,
