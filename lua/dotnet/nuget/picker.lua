@@ -16,7 +16,7 @@ function M.create(opts)
         values = {},
         win_opts = utils.center_win(0.5, 0.5),
         keymaps = {},
-        on_change = function(val) print(val) end,
+        on_change = function(_) end,
         display = function(val) return val end,
     }
 

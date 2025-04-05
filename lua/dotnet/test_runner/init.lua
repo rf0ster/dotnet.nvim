@@ -251,7 +251,6 @@ end
 
 local run_test = function()
     local info = get_test_info()
-    print(vim.inspect(info))
     local s = info.sln_name
     local p = info.proj_name
     local t = info.test_name
@@ -281,9 +280,7 @@ local run_test = function()
     vim.api.nvim_buf_set_lines(M.bufnr_output, 0, -1, false, {})
 
     local target = p or s
-    print(target)
     local cmd ="dotnet test " .. target .. filter .. " --logger \"trx;LogFileName=nvim_dotnet_results.trx\""
-    print(cmd)
     vim.fn.jobstart(cmd, {
         on_stdout = on_output,
         on_stderr = on_output,

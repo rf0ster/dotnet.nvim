@@ -20,7 +20,7 @@ local config = require "dotnet.nuget.config"
 local utils = require "dotnet.utils"
 local api = require "dotnet.nuget.api"
 
-function M.open()
+function M.open(proj_file)
     local d = utils.get_centered_win_dims(
         config.opts.ui.width,
         config.opts.ui.height
@@ -87,16 +87,13 @@ function M.open()
             border = config.opts.ui.border,
         },
         keymaps = {},
-        on_change = function(pkg)
-            if pkg then
-                print(pkg.id)
-            end
+        on_change = function(_)
         end,
         display = function(pkg)
             if not pkg then
                 return ""
             end
-            return pkg.id
+            return " " .. pkg.id
         end,
     })
     M.pkgs_bufnr, M.pkgs_win = packages.bufnr, packages.win_id

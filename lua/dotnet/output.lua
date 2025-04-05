@@ -37,7 +37,6 @@ function M.run_cmd(cmd)
         border = "double",
         title = "Output - " .. cmd,
     })
-    print("Output win id: " .. win)
 
     vim.wo[win].wrap = false
     vim.wo[win].cursorline = false

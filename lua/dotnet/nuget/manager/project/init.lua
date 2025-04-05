@@ -80,9 +80,9 @@ function M.open_tab(opt)
     M.header.tab(opt)
 
     if opt == 0 then
-        M.tab = tab_b.open()
+        M.tab = tab_b.open(M.proj_file)
     elseif opt == 1 then
-        M.tab = tab_i.open()
+        M.tab = tab_i.open(M.proj_file)
     elseif opt == 2 then
         M.tab = tab_u.open()
     end
