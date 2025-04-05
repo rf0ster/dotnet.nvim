@@ -57,6 +57,12 @@ function M.create(opts)
 
     -- assumes values is a table 
     local set_values = function(vals)
+        -- If buffer or window is closed, do nothing
+        if not vim.api.nvim_buf_is_valid(bufnr) or not vim.api.nvim_win_is_valid(win_id) then
+            return
+        end
+
+
         values = vals or {}
 
         local display_values = {}
