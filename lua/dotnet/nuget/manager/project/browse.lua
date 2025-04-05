@@ -14,8 +14,11 @@
 
 local M  = {}
 
+local prompt = require "dotnet.nuget.prompt"
+local picker = require "dotnet.nuget.picker"
 local config = require "dotnet.nuget.config"
 local utils = require "dotnet.utils"
+local api = require "dotnet.nuget.api"
 
 function M.open()
     local d = utils.get_centered_win_dims(
@@ -42,22 +45,62 @@ function M.open()
     local view_r = d.row + header_h + 2
     local view_c = d.col + search_w + 2
 
-    M.search_bufnr, M.search_win = utils.float_win("Search", {
-        height = search_h,
-        width = search_w,
-        row = search_r,
-        col = search_c,
-        style = config.opts.ui.style,
-        border = config.opts.ui.border,
+    local packages
+
+    M.search_bufnr, M.search_win = prompt.create({
+        title = "Search",
+        win_opts = {
+            height = search_h,
+            width = search_w,
+            row = search_r,
+            col = search_c,
+            style = config.opts.ui.style,
+            border = config.opts.ui.border,
+        },
+        on_change = function(val)
+            if not val or val == "" then
+                packages.set_values({})
+                return
+            end
+
+            local query = string.match(val, "%S+")
+            if not query then
+                packages.set_values({})
+                return
+            end
+
+            local take = 2 * pkgs_h
+            local pkg_list = api.query(query, take) or {}
+            packages.set_values(pkg_list)
+        end,
     })
-    M.pkgs_bufnr, M.pkgs_win = utils.float_win("Packages", {
-        height = pkgs_h,
-        width = pkgs_w,
-        row = pkgs_r,
-        col = pkgs_c,
-        style = config.opts.ui.style,
-        border = config.opts.ui.border,
+
+    packages = picker.create({
+        title = "Packages",
+        values = {},
+        win_opts = {
+            height = pkgs_h,
+            width = pkgs_w,
+            row = pkgs_r,
+            col = pkgs_c,
+            style = config.opts.ui.style,
+            border = config.opts.ui.border,
+        },
+        keymaps = {},
+        on_change = function(pkg)
+            if pkg then
+                print(pkg.id)
+            end
+        end,
+        display = function(pkg)
+            if not pkg then
+                return ""
+            end
+            return pkg.id
+        end,
     })
+    M.pkgs_bufnr, M.pkgs_win = packages.bufnr, packages.win_id
+
     M.view_bufnr, M.view_win = utils.float_win("View", {
         height = view_h,
         width = view_w,

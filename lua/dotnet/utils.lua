@@ -166,7 +166,8 @@ function M.create_knot(win_ids)
     local group_id = vim.api.nvim_create_augroup(augroup_name, { clear = true })
 
     local function untie()
-      vim.api.nvim_del_augroup_by_id(group_id)
+        -- run command and igore any errors
+        pcall(function() vim.api.nvim_del_augroup_by_id(group_id) end)
     end
 
     -- Function to close all the windows and clear the autocmds

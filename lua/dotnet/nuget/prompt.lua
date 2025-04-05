@@ -18,7 +18,7 @@ function M.create(opts)
     local defaults = {
         title = "Prompt",
         win_opts = win_opts,
-        debounce = 200,
+        debounce = 500,
         on_change = function(_) end,
     }
 
@@ -65,10 +65,7 @@ function M.create(opts)
         end
     })
 
-    return {
-        bufnr = bufnr,
-        win_id = win_id,
-    }
+    return bufnr, win_id
 end
 
 return M
