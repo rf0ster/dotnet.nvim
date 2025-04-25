@@ -202,6 +202,11 @@ function M.create_knot(win_ids)
       end,
     })
 
+    for _, win in ipairs(win_ids) do
+        local bufnr = vim.api.nvim_win_get_buf(win)
+        vim.api.nvim_buf_set_keymap(bufnr, "n", "<Esc>", ":q!<CR>", { noremap = true, silent = true, })
+    end
+
     return { win_ids = win_ids, untie = untie }
 end
 return M

@@ -70,6 +70,32 @@ function M.open()
     return {
         wins = { M.search_win, M.pkgs_win, M.view_win },
         bufs = { M.search_bufnr, M.pkgs_bufnr, M.view_bufnr },
+        close = function()
+            if M.search_win and vim.api.nvim_win_is_valid(M.search_win) then
+                vim.api.nvim_win_close(M.search_win, true)
+            end
+            if M.pkgs_win and vim.api.nvim_win_is_valid(M.pkgs_win) then
+                vim.api.nvim_win_close(M.pkgs_win, true)
+            end
+            if M.view_win and vim.api.nvim_win_is_valid(M.view_win) then
+                vim.api.nvim_win_close(M.view_win, true)
+            end
+            if M.search_bufnr and vim.api.nvim_buf_is_valid(M.search_bufnr) then
+                vim.api.nvim_buf_delete(M.search_bufnr, { force = true })
+            end
+            if M.pkgs_bufnr and vim.api.nvim_buf_is_valid(M.pkgs_bufnr) then
+                vim.api.nvim_buf_delete(M.pkgs_bufnr, { force = true })
+            end
+            if M.view_bufnr and vim.api.nvim_buf_is_valid(M.view_bufnr) then
+                vim.api.nvim_buf_delete(M.view_bufnr, { force = true })
+            end
+            M.search_bufnr = nil
+            M.search_win = nil
+            M.pkgs_bufnr = nil
+            M.pkgs_win = nil
+            M.view_bufnr = nil
+            M.view_win = nil
+        end
     }
 end
 

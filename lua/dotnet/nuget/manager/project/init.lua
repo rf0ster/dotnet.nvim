@@ -51,18 +51,8 @@ function M.close_tab()
         M.knot = nil
     end
 
-    if M.tab then
-        for _, win in ipairs(M.tab.wins or {}) do
-            if win ~= nil and vim.api.nvim_win_is_valid(win) then
-                vim.api.nvim_win_close(win, true)
-            end
-        end
-        for _, buf in ipairs(M.tab.bufs or {}) do
-            if buf ~= nil and vim.api.nvim_buf_is_valid(buf) then
-                vim.api.nvim_buf_delete(buf, { force = true })
-            end
-        end
-        M.tab = nil
+    if M.tab and M.tab.close then
+        M.tab.close()
     end
 end
 
