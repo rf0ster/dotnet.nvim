@@ -87,5 +87,14 @@ function M.print_solution_info()
     end
 end
 
+function M.get_project(project_name)
+    for _, project in ipairs(M.projects) do
+        if project.name == project_name then
+            return project
+        end
+    end
+    return nil
+end
+
 return M
 

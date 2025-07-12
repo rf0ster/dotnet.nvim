@@ -3,19 +3,22 @@
 
 local M = {}
 
+local dotnet_cli = require("dotnet.cli")
+local dotnet_manager = require("dotnet.manager")
+local dotnet_nuget_project = require("dotnet.nuget.project")
+
+local finders = require "telescope.finders"
+local pickers = require "telescope.pickers"
+local sorters = require "telescope.sorters"
+local actions_state = require "telescope.actions.state"
+local confirm = require "dotnet.confirm"
+
 function M.open()
-    local sln_info = require("dotnet.manager").load_solution()
+    local sln_info = dotnet_manager.load_solution()
+    print("Solution Info: ", vim.inspect(sln_info))
     if not sln_info then
         return
     end
-
-    local dotnet_cli = require("dotnet.cli")
-    local dotnet_nuget_project = require("dotnet.nuget.project")
-
-    local finders = require "telescope.finders"
-    local pickers = require "telescope.pickers"
-    local sorters = require "telescope.sorters"
-    local actions_state = require "telescope.actions.state"
 
     local prompt_title = sln_info.sln_name
     local results_title = "Projects (n)uget - (b)uild - (c)lean - (r)estore - (d)elete"
@@ -58,8 +61,22 @@ function M.open()
                 dotnet_cli.restore(project)
             end)
             map("n", "d", function()
-                local project = actions_state.get_selected_entry().value
-                dotnet_cli.delete_project(project)
+                local value = actions_state.get_selected_entry().value
+                local project = dotnet_manager.get_project(value)
+                if not project then
+                    return
+                end
+
+                confirm.open({
+                    prompt_title = "Delete Project",
+                    prompt = {"Delete " .. project.name ..  " from " .. sln_info.sln_name .. "?"},
+                    on_close = function(answer)
+                        if answer == "yes" then
+                            dotnet_cli.sln_remove(sln_info.sln_file, project.name)
+                            dotnet_manager.load_solution()
+                        end
+                    end
+                })
             end)
             return true
         end,
