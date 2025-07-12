@@ -373,7 +373,7 @@ local create_windows = function()
                 table.insert(output, "   Stack Trace:")
 
                 local w = vim.api.nvim_win_get_width(M.win_results)
-                local smart_lines = utils.smart_split(result.output.StackTrace, w, 5, 1)
+                local smart_lines = utils.split_smart(result.output.StackTrace, w, 5, 1)
                 for _, line in ipairs(smart_lines) do
                     table.insert(output, line)
                 end

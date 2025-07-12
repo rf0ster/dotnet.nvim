@@ -55,7 +55,7 @@ function M.run_cmd(cmd)
         vim.api.nvim_buf_set_option(bufnr, "modifiable", true)
 
         for _, line in ipairs(data) do
-            local smart_split = utils.smart_split(line, win_width, 2, 2)
+            local smart_split = utils.split_smart(line, win_width, 2, 2, 2)
 
             if #smart_split == 0 then
                 consecutive_spaces = consecutive_spaces + 1

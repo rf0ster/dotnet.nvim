@@ -97,37 +97,50 @@ function M.center_win_height(h_perc, opts)
     return opts
 end
 
--- Given a single string, splits it into a table of strings
--- based on the newline character. 
-function M.smart_split(str, width, pad_left, pad_right)
+-- Splits a string into lines that fit within the specified width.
+-- It will first split the string by newlines, and then each line will
+-- further be split into smaller lines that fit within the specified width.
+-- Additionally, the resulting line will have leading whitespace removed,
+-- a padding applied to the left and right, and a specified indentation 
+-- for lines that are wrapped. Each resulting line will always be less
+-- than or equal to the specified width.
+function M.split_smart(str, width, pad_left, pad_right, indent)
+    indent = indent or 0
     pad_left = pad_left or 0
     pad_right = pad_right or 0
+
     local padded_width = width - pad_left - pad_right
+    local indented_width = padded_width - indent
 
     local function pad(s)
         return string.rep(" ", pad_left) .. s .. string.rep(" ", pad_right)
     end
 
-    local newline_splits = {}
-    for line in str:gmatch("[^\r\n]+") do
-        table.insert(newline_splits, line)
-    end
-
-    -- Remove leading and trailing whitespace from each line
-    for i, line in ipairs(newline_splits) do
-        newline_splits[i] = line:gsub("^%s+", ""):gsub("%s+$", "")
+    local function indent_line(line)
+        return string.rep(" ", indent) .. line
     end
 
     local lines = {}
-    for _, line in ipairs(newline_splits) do
+    for line in str:gmatch("[^\r\n]+") do
+        -- Remove leading and trailing whitespace from each line
+        line = line:gsub("^%s+", ""):gsub("%s+$", "")
+        -- If the new line is shorter than the padded width, add it to table
         if #line < padded_width then
             table.insert(lines, pad(line))
             goto continue
         end
 
-        for i = 1, #line, padded_width do
-            local l = pad(line:sub(i, i + padded_width - 1))
-            table.insert(lines, l)
+        -- The first split will be calculated without indentation.
+        -- Add the first line with padding, but no indentation.
+        local first_line = line:sub(1, padded_width)
+        table.insert(lines, pad(first_line))
+
+        -- Start splitting the rest of the lines with indentation.
+        for i = padded_width + 1, #line, indented_width do
+            local l = line:sub(i, i + indented_width - 1)
+            if l ~= "" then
+                table.insert(lines, indent_line(pad(l)))
+            end
         end
 
         ::continue::

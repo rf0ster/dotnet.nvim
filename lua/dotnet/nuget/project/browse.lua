@@ -115,7 +115,7 @@ function M.open(proj_file)
             })
 
             local w = vim.api.nvim_win_get_width(M.view_win)
-            local s = utils.smart_split(pkg.description, w, 3, 1)
+            local s = utils.split_smart(pkg.description, w, 3, 1)
             vim.api.nvim_buf_set_lines(M.view_bufnr, 3, -1, false, s)
             vim.api.nvim_buf_set_option(M.view_bufnr, "modifiable", false)
         end,
