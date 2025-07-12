@@ -108,10 +108,6 @@ function M.smart_split(str, width, pad_left, pad_right)
         return string.rep(" ", pad_left) .. s .. string.rep(" ", pad_right)
     end
 
-    local function indent(s, len)
-        return string.rep(" ", len) .. s
-    end
-
     local newline_splits = {}
     for line in str:gmatch("[^\r\n]+") do
         table.insert(newline_splits, line)
@@ -130,15 +126,7 @@ function M.smart_split(str, width, pad_left, pad_right)
         end
 
         for i = 1, #line, padded_width do
-            local pw = padded_width
-            local indent_w = 0
-            if i > 1 then
-                pw = padded_width + pad_left
-                indent_w = pad_left
-            end
-            local l = pad(line:sub(i, i + pw - 1))
-            l = indent(l, indent_w)
-
+            local l = pad(line:sub(i, i + padded_width - 1))
             table.insert(lines, l)
         end
 
