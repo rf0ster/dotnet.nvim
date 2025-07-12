@@ -132,6 +132,18 @@ function M.open(proj_file)
         packages.set_values(pkgs)
     end)
 
+    -- Set Navigation Keymaps
+    local nav_to = function(k, from, to)
+        vim.keymap.set("n", k, function() vim.api.nvim_set_current_win(to) end, { buffer = from })
+    end
+
+    nav_to("fj", M.search_bufnr, M.pkgs_win)
+    nav_to("fl", M.search_bufnr, M.view_win)
+    nav_to("fk", M.pkgs_bufnr, M.search_win)
+    nav_to("fl", M.pkgs_bufnr, M.view_win)
+    nav_to("fh", M.view_bufnr, M.search_win)
+
+
 
     return {
         wins = { M.search_win, M.pkgs_win, M.view_win },

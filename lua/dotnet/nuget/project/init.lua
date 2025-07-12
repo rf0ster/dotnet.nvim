@@ -13,10 +13,10 @@
 -- ********************************
 local M = {}
 
-local header = require "dotnet.nuget.manager.project.header"
-local tab_b = require "dotnet.nuget.manager.project.browse"
-local tab_i = require "dotnet.nuget.manager.project.installed"
-local tab_u = require "dotnet.nuget.manager.project.updates"
+local header = require "dotnet.nuget.project.header"
+local tab_b = require "dotnet.nuget.project.browse"
+local tab_i = require "dotnet.nuget.project.installed"
+local tab_u = require "dotnet.nuget.project.updates"
 local utils = require "dotnet.utils"
 
 -- opens the nuget manager

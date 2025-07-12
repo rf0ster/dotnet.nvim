@@ -3,6 +3,7 @@ local M = {}
 local sln_file = nil
 local sln_name = nil
 local sln_projects = nil
+local loading = false
 
 -- Locates a file on disk based on a pattern
 -- @param match The pattern to match
@@ -24,6 +25,40 @@ local function locate_file(match, depth)
     })
 
     return file
+end
+
+-- Loads the solution, projects and tests
+-- asynchronously in the background.
+function M.load_solution_async()
+    if loading then
+        return
+    end
+
+    local stdout = vim.loop.new_pipe(false)
+    stdout:read_start(function(err, data)
+        print("Read start")
+        if err then
+            print("Error: " .. err)
+        end
+
+        if data then
+            print("Data: " .. data)
+        end
+    end)
+
+    vim.loop.spawn("nvim", {
+        args = {
+            "--headless",
+            "-u", "NONE",
+            "-c", "[[lua print('hello'); io.stdout:flush()]]",
+            "-c", "quit"
+        },
+        stdio = {nil, stdout, nil},
+    }, function(code)
+        stdout:read_stop()
+        stdout:close()
+        print("Solution loaded with code: " .. code)
+    end)
 end
 
 -- Load the solution file 
