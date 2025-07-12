@@ -22,9 +22,9 @@ M.setup = function(config)
         end
 
         if opts.args == "solution" then
-            require "dotnet.solution.manager".open()
+            require "dotnet.manager.solution".open()
         elseif opts.args == "projects" then
-            require "dotnet.solution.manager".open_projects()
+            require "dotnet.manager.projects".open()
         elseif opts.args == "tests" then
             require "dotnet.test_runner".open()
         end

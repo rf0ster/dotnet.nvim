@@ -1,8 +1,6 @@
 local M = {}
 
 function M.picker(opts)
-    require "dotnet.output".clear()
-
     local finders = require "telescope.finders"
     local pickers = require "telescope.pickers"
     local sorters = require "telescope.sorters"

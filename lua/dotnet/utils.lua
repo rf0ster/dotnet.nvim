@@ -98,13 +98,7 @@ function M.center_win_height(h_perc, opts)
 end
 
 -- Given a single string, splits it into a table of strings
--- based on the newline character. If you provide a bufnr,
--- it will also calculate the width of the buffer and further
--- split the string into lines based on the width of the buffer.
--- given a single string, splits it into a table of strings
--- based on the newline character. If you provide a bufnr,
--- it will also calculate the width of the buffer and further
--- split the string into lines based on the width of the buffer.
+-- based on the newline character. 
 function M.smart_split(str, width, pad_left, pad_right)
     pad_left = pad_left or 0
     pad_right = pad_right or 0
@@ -114,9 +108,18 @@ function M.smart_split(str, width, pad_left, pad_right)
         return string.rep(" ", pad_left) .. s .. string.rep(" ", pad_right)
     end
 
+    local function indent(s, len)
+        return string.rep(" ", len) .. s
+    end
+
     local newline_splits = {}
     for line in str:gmatch("[^\r\n]+") do
         table.insert(newline_splits, line)
+    end
+
+    -- Remove leading and trailing whitespace from each line
+    for i, line in ipairs(newline_splits) do
+        newline_splits[i] = line:gsub("^%s+", ""):gsub("%s+$", "")
     end
 
     local lines = {}
@@ -127,8 +130,16 @@ function M.smart_split(str, width, pad_left, pad_right)
         end
 
         for i = 1, #line, padded_width do
-            local l = line:sub(i, i + padded_width - 1)
-            table.insert(lines, pad(l))
+            local pw = padded_width
+            local indent_w = 0
+            if i > 1 then
+                pw = padded_width + pad_left
+                indent_w = pad_left
+            end
+            local l = pad(line:sub(i, i + pw - 1))
+            l = indent(l, indent_w)
+
+            table.insert(lines, l)
         end
 
         ::continue::
@@ -209,4 +220,23 @@ function M.create_knot(win_ids)
 
     return { win_ids = win_ids, untie = untie }
 end
+
+M.clean_line = function(line)
+    if line:match("^%s*$") then
+        line = ""
+    end
+
+    if line ~= "" then
+        -- Replace carriage return (^M) with nothing
+        -- Is this only on windows??
+        line = string.gsub(line, "\r", "")
+        -- Trim leading and trailing whitespace
+        line = line:gsub("^%s+", ""):gsub("%s+$", "")
+        -- Add indentation
+        line = " " .. line
+    end
+
+    return line
+end
+
 return M

@@ -264,11 +264,10 @@ local run_test = function()
         filter = " --filter " .. t
     end
 
-    local output = require "dotnet.output"
     local on_output = function(_, data, _)
         if data then
             for _, line in ipairs(data) do
-                vim.api.nvim_buf_set_lines(M.bufnr_output, -1, -1, false, {output.clean_line(line)})
+                vim.api.nvim_buf_set_lines(M.bufnr_output, -1, -1, false, {utils.clean_line(line)})
             end
         end
         local last_line = vim.api.nvim_buf_line_count(M.bufnr_output)

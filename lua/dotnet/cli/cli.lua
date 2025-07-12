@@ -3,6 +3,8 @@ local M = {}
 -- Tracks a history of commands that have been run for a single session.
 local history = {}
 
+local cli_output = require "dotnet.cli.output"
+
 -- Helper function to run a shell command and capture the output
 -- Using a wrapper function because I am have played around with different ways to run shell commands.
 local function shell_command(cmd)
@@ -72,7 +74,7 @@ end
 -- param cmd: The command to run.
 local function run_cmd(cmd)
     table.insert(history, 1, cmd)
-    require "dotnet.output".run_cmd(cmd)
+    cli_output.run_cmd(cmd)
 end
 
 function M.restore(target)
@@ -109,7 +111,7 @@ function M.open_history()
                 fn = function(prompt_bufnr)
                     local selection = require "telescope.actions.state".get_selected_entry()
                     require "telescope.actions".close(prompt_bufnr)
-                    require "dotnet.output".run_cmd(selection.value)
+                    require "dotnet.cli.output".run_cmd(selection.value)
                 end
             }
         }
@@ -119,7 +121,7 @@ end
 -- Runs the last command in the history.
 function M.run_last_cmd()
     if history[1] then
-        require "dotnet.output".run_cmd(history[1])
+        cli_output.run_cmd(history[1])
     end
 end
 
