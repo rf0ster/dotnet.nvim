@@ -14,37 +14,87 @@ local sorters = require "telescope.sorters"
 local actions = require "telescope.actions"
 local actions_state = require "telescope.actions.state"
 
+local function pad(str, length)
+    if #str >= length then
+        return str
+    end
+    return str .. string.rep(" ", length - #str)
+end
+
+
 function M.open()
     local sln_info = dotnet_manager.load_solution()
     if not sln_info then
         return
     end
 
-    local prompt_title = sln_info.sln_name
-    local results_title = "Projects (n)uget - (b)uild - (c)lean - (r)estore - (d)elete"
+    local display_rel = true
 
-    -- Create a finder that lists all projects in the solution
-    local finder = finders.new_table {
-        results = vim.tbl_map(function(cmd)
-            return cmd.name
-        end, sln_info.projects or {}),
-    }
-
-    local function get_project_info()
-        local project = actions_state.get_selected_entry().value
-        local project_info = dotnet_manager.get_project(project)
-        if not project_info then
-            return nil
+    -- Function to get the maximum length of project names
+    -- to ensure consistent padding in the display.
+    local function get_max_project_name_length()
+        local max_length = 0
+        for _, project in ipairs(sln_info.projects or {}) do
+            if #project.name > max_length then
+                max_length = #project.name
+            end
         end
-        return project_info
+        return max_length
+    end
+
+    -- Function to get the display results for the picker.
+    -- It formats the project names and paths based on the
+    -- the users preference for relative or absolute paths.
+    local function get_results_display()
+        local max_length = get_max_project_name_length()
+        local results = {}
+        for _, project in ipairs(sln_info.projects or {}) do
+            local display = pad(project.name, max_length)
+            if display_rel then
+                display = display .. " " .. project.path_rel
+            else
+                display = display .. " " .. project.path_abs
+            end
+            table.insert(results, {
+                value = project,
+                display = display,
+                ordinal = project.name,
+            })
+        end
+
+        return results
+    end
+
+    -- Function to create an entry for each project in the picker.
+    local function entry_maker(entry)
+        return {
+            value = entry.value,
+            display = entry.display,
+            ordinal = entry.ordinal,
+        }
+    end
+
+    -- Function to reload the picker after the user toggles
+    -- the display mode between relative and absolute paths.
+    local function reload_picker(prompt_bufnr)
+        actions_state.get_current_picker(prompt_bufnr):refresh(
+            finders.new_table {
+                results = get_results_display(),
+                entry_maker = entry_maker,
+            },
+            { reset_prompt = true }
+        )
     end
 
     pickers.new({}, {
-        initial_mode = "normal",
-        prompt_title = prompt_title,
-        results_title = results_title,
-        finder = finder,
+        prompt_title = sln_info.sln_name,
+        results_title = "Projects (n)uget - (b)uild - (c)lean - (r)estore - (d)elete",
+        finder = finders.new_table {
+            results = get_results_display(),
+            entry_maker = entry_maker,
+        },
         sorter = sorters.get_generic_fuzzy_sorter(),
+        initial_mode = "normal",
         sorting_strategy = "ascending",
         layout_strategy = "vertical",
         layout_config = {
@@ -53,8 +103,12 @@ function M.open()
             height = 0.5,
         },
         attach_mappings = function(_, map)
+            map("n", "p", function(prompt_bufnr)
+                display_rel = not display_rel
+                reload_picker(prompt_bufnr)
+            end)
             map("n", "<CR>", function(prompt_buffrn)
-                local project = get_project_info()
+                local project = actions_state.get_selected_entry().value
                 actions.close(prompt_buffrn)
 
                 if not project then
@@ -63,35 +117,35 @@ function M.open()
                 vim.api.nvim_command("e " .. project.path_abs)
             end)
             map("n", "n", function()
-                local project = get_project_info()
+                local project = actions_state.get_selected_entry().value
                 if not project then
                     return
                 end
                 dotnet_nuget_project.open(project.path_abs)
             end)
             map("n", "b", function()
-                local project = get_project_info()
+                local project = actions_state.get_selected_entry().value
                 if not project then
                     return
                 end
                 require "dotnet.manager.projects.build".open_build(project)
             end)
             map("n", "c", function()
-                local project = get_project_info()
+                local project = actions_state.get_selected_entry().value
                 if not project then
                     return
                 end
                 dotnet_cli.clean(project.path_abs)
             end)
             map("n", "r", function()
-                local project = get_project_info()
+                local project = actions_state.get_selected_entry().value
                 if not project then
                     return
                 end
                 dotnet_cli.restore(project.path_abs)
             end)
             map("n", "d", function()
-                local project = get_project_info()
+                local project = actions_state.get_selected_entry().value
                 if not project then
                     return
                 end
