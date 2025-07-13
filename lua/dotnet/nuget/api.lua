@@ -31,16 +31,11 @@ function M.get_dependencies(package_id, version)
     local uri = "https://api.nuget.org/v3/registration5-semver1";
     local url = string.format(uri .. "/%s/%s.json", package_id:lower(), version:lower())
 
-    print(url)
     local res = curl.get(url)
-    print(res.status)
     if res.status ~= 200 then
         print("Failed to fetch .nuspec for " .. package_id .. "@" .. version)
         return nil
     end
-
-    -- Print the response body for debugging using the inspect
-    print(vim.inspect(res.body))
 
     local deps = {}
     local dependencies_block = res.body:match("<dependencies.->(.-)</dependencies>")

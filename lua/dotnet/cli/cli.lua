@@ -82,8 +82,8 @@ function M.restore(target)
     return run_cmd("dotnet restore" .. add_target(target))
 end
 
-function M.build(target)
-    return run_cmd("dotnet build" .. add_target(target))
+function M.build(target, configuration)
+    return run_cmd("dotnet build" .. add_target(target) .. add_param("configuration", configuration))
 end
 
 function M.clean(target)

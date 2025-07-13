@@ -61,11 +61,13 @@ function M.load_solution(sln_file_path)
         -- Extract the project name, path, and guid
         local project_pattern = 'Project%("([^"]+)"%) = "([^"]+)", "([^"]+)", "([^"]+)"'
         local _, project_name, project_path, project_guid = line:match(project_pattern)
+
         if project_name and project_path and project_guid then
             table.insert(projects, {
                 name = project_name,
-                path = vim.fn.fnamemodify(project_path, ":p"), -- Convert to absolute path
                 guid = project_guid,
+                path_rel = project_path:gsub("\\", "/"),
+                path_abs = vim.fn.fnamemodify(project_path, ":p"):gsub("\\", "/"),
             })
         end
     end
@@ -81,9 +83,10 @@ function M.print_solution_info()
 
     print("Projects:")
     for _, project in ipairs(M.projects) do
-        print("  - Name: " .. (project.name or ""))
-        print("    Path: " .. (project.path or ""))
-        print("    GUID: " .. (project.guid or ""))
+        print("  - GUID:     " .. (project.guid or ""))
+        print("  - Name:     " .. (project.name or ""))
+        print("  - Path Rel: " .. (project.path_rel or ""))
+        print("  - Path Rel: " .. (project.path_abs or ""))
     end
 end
 
