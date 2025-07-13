@@ -73,62 +73,41 @@ end
 -- Runs a command and displays the output in a new window.
 -- Stores the command in the history.
 -- param cmd: The command to run.
-local function run_cmd(cmd)
+function M.run_cmd(cmd)
     table.insert(history, 1, cmd)
     cli_output.run_cmd(cmd)
 end
 
 function M.restore(target)
-    return run_cmd("dotnet restore" .. add_target(target))
+    return M.run_cmd("dotnet restore" .. add_target(target))
 end
 
 function M.build(target, configuration)
-    return run_cmd("dotnet build" .. add_target(target) .. add_param("configuration", configuration))
+    return M.run_cmd("dotnet build" .. add_target(target) .. add_flag("-c", configuration))
 end
 
 function M.clean(target)
-    return run_cmd("dotnet clean" .. add_target(target))
+    return M.run_cmd("dotnet clean" .. add_target(target))
 end
 
 function M.mstest(target, filter, logger)
-    return run_cmd("dotnet test" .. add_target(target) .. add_param("filter", filter) .. add_param("logger", logger))
-end
-
--- Opens a picker with the command history.
-function M.open_history()
-    local sln = require "dotnet.solution".get_solution()
-    if not sln then
-        return
-    end
-
-    require "dotnet.picker".picker({
-        prompt_title = sln.name,
-        results_title = "History",
-        items = history,
-        maps = {
-            {
-                mode = "n",
-                key = "<CR>",
-                fn = function(prompt_bufnr)
-                    local selection = require "telescope.actions.state".get_selected_entry()
-                    require "telescope.actions".close(prompt_bufnr)
-                    require "dotnet.cli.output".run_cmd(selection.value)
-                end
-            }
-        }
-    })
+    return M.run_cmd("dotnet test" .. add_target(target) .. add_param("filter", filter) .. add_param("logger", logger))
 end
 
 -- Runs the last command in the history.
 function M.run_last_cmd()
     if history[1] then
-        cli_output.run_cmd(history[1])
+        M.run_cmd(history[1])
     end
 end
 
 -- Adds a package to the given project.
 function M.add_package(project, package, version)
-    return run_cmd("dotnet add " .. project .. " package " .. package .. add_param("version", version))
+    return M.run_cmd("dotnet add " .. project .. " package " .. package .. add_param("version", version))
+end
+
+function M.get_history()
+    return history
 end
 
 return M
