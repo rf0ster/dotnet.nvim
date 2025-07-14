@@ -17,6 +17,8 @@ local M = {
     projects = {}
 }
 
+local guid = require("dotnet.manager.guid")
+
 -- Function to load ths solution from disk.
 -- @param sln_file_path The path to the solution file
 -- If the path does not include the file name, it will search for the first solution file in the current directory.
@@ -60,15 +62,19 @@ function M.load_solution(sln_file_path)
         -- Project("{<project-type-guid>}") = "<project-name>", "<project-path>", "{<project-guid>}" EndProject
         -- Extract the project name, path, and guid
         local project_pattern = 'Project%("([^"]+)"%) = "([^"]+)", "([^"]+)", "([^"]+)"'
-        local _, project_name, project_path, project_guid = line:match(project_pattern)
+        local project_type_guid, project_name, project_path, project_guid = line:match(project_pattern)
 
-        if project_name and project_path and project_guid then
-            table.insert(projects, {
-                name = project_name,
-                guid = project_guid,
-                path_rel = project_path:gsub("\\", "/"),
-                path_abs = vim.fn.fnamemodify(project_path, ":p"):gsub("\\", "/"),
-            })
+        if project_type_guid and project_name and project_path and project_guid then
+            local project_type = guid[project_type_guid]
+            if project_type and project_type.is_proj then
+                table.insert(projects, {
+                    name = project_name,
+                    guid = project_guid,
+                    type = project_type.type,
+                    path_rel = project_path:gsub("\\", "/"),
+                    path_abs = vim.fn.fnamemodify(project_path, ":p"):gsub("\\", "/"),
+                })
+            end
         end
     end
     M.projects = projects
