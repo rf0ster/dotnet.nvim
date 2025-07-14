@@ -8,7 +8,6 @@ local cli_output = require "dotnet.cli.output"
 -- Helper function to run a shell command and capture the output
 -- Using a wrapper function because I am have played around with different ways to run shell commands.
 local function shell_command(cmd)
-    print("Running command: " .. cmd)
     return vim.fn.systemlist(cmd)
 end
 

@@ -89,10 +89,12 @@ function M.print_solution_info()
 
     print("Projects:")
     for _, project in ipairs(M.projects) do
+        print("  " .. (project.name or ""))
         print("  - GUID:     " .. (project.guid or ""))
-        print("  - Name:     " .. (project.name or ""))
         print("  - Path Rel: " .. (project.path_rel or ""))
-        print("  - Path Rel: " .. (project.path_abs or ""))
+        print("  - Path Abs: " .. (project.path_abs or ""))
+        print("  - Type:     " .. (project.type or ""))
+        print("")
     end
 end
 

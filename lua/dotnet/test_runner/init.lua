@@ -1,13 +1,12 @@
 local M = {}
 
-local solution = require "dotnet.solution"
 local parser = require "dotnet.test_runner.parser"
+local manager = require "dotnet.manager"
 local utils = require "dotnet.utils"
 local cli = require "dotnet.cli"
 
 -- creates a namespace for the circle markers
 local ns_id = vim.api.nvim_create_namespace("circle_namespace")
-
 
 local set_buf_modifiable = function(bufnr, modifiable)
     vim.api.nvim_buf_set_option(bufnr, "readonly", not modifiable)
@@ -90,23 +89,18 @@ end
 
 -- Loads the tests from the solution
 local function load_tests()
-    local sln = solution.get_solution()
-    if sln == nil then
-        return
-    end
-
-    local projects = solution.get_projects()
-    if not projects then
+    local sln = manager.load_solution()
+    if sln == nil or sln.projects == nil then
         return
     end
 
     M.sln_outcome = {
         result = { "No Results" },
-        sln_name = sln.name,
+        sln_name = sln.sln_name, -- Get relative path
     }
     M.tests = {}
-    for _, project in ipairs(projects) do
-        local output = cli.test_list_all(project.file)
+    for _, project in ipairs(sln.projects) do
+        local output = cli.test_list_all(project.path_abs)
         if not output then
             break
         end
@@ -124,18 +118,25 @@ local function load_tests()
                     tests = {}
                 end
                 local name = line:match("^%s*(.-)%s*$")
-                tests[name] = {
-                    name = name,
-                    result = { "No Results" }
-                }
+                if name ~= nil and name ~= "" and not name:find("Workload updates are available") then
+                    tests[name] = {
+                        name = name,
+                        result = { "No Results" }
+                    }
+                end
             end
         end
 
         if tests ~= nil then
-            local results_file = project.file:match("(.*/)") .. "TestResults/nvim_dotnet_results.trx"
-            M.tests[project.file] = {
-                proj_name = project.name,
-                proj_file = project.file,
+            local results_file = project.path_abs:match("(.*/)")
+            if vim.fn.has("win32") == 1 or vim.fn.has("win64") == 1 then
+                results_file = results_file .. "\\TestResults\\nvim_dotnet_results.trx"
+            else
+                results_file = results_file .. "TestResults/nvim_dotnet_results.trx"
+            end
+
+            M.tests[project.path_rel] = {
+                project = project,
                 results_file = results_file,
                 tests = tests
             }
@@ -237,8 +238,8 @@ local write_tests_to_buffer = function()
 
     -- Write the tests to the buffer
     write_test(M.sln_outcome.sln_name, 2, get_highlight(M.sln_outcome.result))
-    for key, val in pairs(M.tests) do
-        write_test(key, 4, get_highlight(val.outcome))
+    for _, val in pairs(M.tests) do
+        write_test(val.project.path_rel, 4, get_highlight(val.outcome))
         if val.tests ~= nil then
             for k, v in pairs(val.tests) do
                 write_test(k, 6, get_highlight(v.result.outcome))

@@ -13,7 +13,6 @@ function M.open()
 
     -- Load the historical commands from the .NET CLI module.
     local commands = dotnet_cli.get_history()
-    print(vim.inspect(commands))
 
     pickers.new({}, {
         prompt_title = "Historical Commands",

@@ -16,21 +16,6 @@ local function decode_json_response(res)
     return data
 end
 
---- Decodes an http response from Nuget APIs that return XML data.
---- @param res table
-local function decode_xml_response(res)
-    if res.status < 200 or 299 < res.status then
-        print("Response status: " .. res.status)
-        return nil
-    end
-
-    local tree_handler = handler:new()
-    local parser = xml2lua.parser(tree_handler)
-    parser:parse(res.body)
-
-    return tree_handler.root
-end
-
 --- Gets the service index for NuGet.
 --- @return table|nil
 function M.get_service_index()
