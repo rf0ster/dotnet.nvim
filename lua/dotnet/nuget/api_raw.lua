@@ -9,7 +9,6 @@ local M = {}
 --- @param res table
 local function decode_json_response(res)
     if res.status < 200 or 299 < res.status then
-        print("Response status: " .. res.status)
         return nil
     end
 
@@ -84,4 +83,46 @@ function M.search_query(query, take, prerelease)
     return decode_json_response(res)
 end
 
+--- Get the NuSpec file for a specific package and version.
+--- @param package_id string
+--- @return table|nil
+function M.get_registration_base(package_id, version)
+    local service_url = M.get_service_url("RegistrationsBaseUrl")
+    if not service_url then
+        return nil
+    end
+
+    local url = service_url .. package_id:lower() .. "/" .. version:lower() .. ".json"
+    local res = curl.get(url, { accept = "application/json" })
+
+    return decode_json_response(res)
+end
+
+--- Put back the test function I had a little while ago
+function M.test(package_id, take)
+    local search_query = M.search_query(package_id, take, true)
+    if search_query == nil then
+        return
+    end
+
+    local pkg = nil
+    for _, item in ipairs(search_query.data) do
+        if item.id == package_id then
+            pkg = item
+            break
+        end
+    end
+
+    if pkg == nil then
+        return
+    end
+    print("Found package: " .. pkg.id .. " version: " .. pkg.version)
+
+    local nuspec = M.get_registration_base(pkg.id, pkg.version)
+    if nuspec == nil then
+        return
+    end
+    print("Nuspec for " .. pkg.id .. " version " .. pkg.version .. ":")
+    print(vim.inspect(nuspec))
+end
 return M
