@@ -5,17 +5,17 @@
 local M = {}
 
 function M.open()
-    local sln_info = require("dotnet.manager").load_solution()
-    if not sln_info then
+    local sln = require("dotnet.manager").load_solution()
+    if not sln then
         return
     end
 
     local dotnet_cli = require("dotnet.cli")
     local commands = {
-        { name = "Build",        on_execute = function() dotnet_cli.build(sln_info.file) end },
-        { name = "Clean",        on_execute = function() dotnet_cli.clean(sln_info.file) end },
-        { name = "Restore",      on_execute = function() dotnet_cli.restore(sln_info.file) end },
-        { name = "Test",         on_execute = function() dotnet_cli.mstest(sln_info.file) end },
+        { name = "Build",        on_execute = function() dotnet_cli.build(sln.sln_path_abs) end },
+        { name = "Clean",        on_execute = function() dotnet_cli.clean(sln.sln_path_abs) end },
+        { name = "Restore",      on_execute = function() dotnet_cli.restore(sln.sln_path_abs) end },
+        { name = "Test",         on_execute = function() dotnet_cli.mstest(sln.sln_path_abs) end },
         { name = "Add project",  on_execute = function() print("Add project") end },
         { name = "New console",  on_execute = function() dotnet_cli.new_console(vim.fn.input("Project name: ")) end },
         { name = "New classlib", on_execute = function() dotnet_cli.new_classlib(vim.fn.input("Project name: ")) end },
@@ -29,7 +29,7 @@ function M.open()
 
     pickers.new({}, {
         initial_mode = "normal",
-        prompt_title = sln_info.sln_name,
+        prompt_title = sln.sln_name,
         results_title = "Solution Commands",
         finder = finders.new_table {
             results = vim.tbl_map(function(cmd)
