@@ -8,17 +8,17 @@ local pickers = require "telescope.pickers"
 local finders = require "telescope.finders"
 local actions_state = require "telescope.actions.state"
 
--- Given the project name, open the build manager
--- and allow the user to configure the build.
-function M.open_build(solution)
+--- Given the solution, open the build manager
+--- @param solution table The solution to open the build manager for
+function M.open(solution)
     if not solution then
         return
     end
 
     -- Create Telescope picker for build configuration options
     local build_options = {
-        { name = "Debug",   action = function() dotnet_cli.build(solution.path_abs, "Debug") end },
-        { name = "Release", action = function() dotnet_cli.build(solution.path_abs, "Release") end },
+        { name = "Debug",   action = function() dotnet_cli.build(solution.sln_path_abs, "Debug") end },
+        { name = "Release", action = function() dotnet_cli.build(solution.sln_path_abs, "Release") end },
     }
 
     local finder = finders.new_table {
@@ -33,7 +33,7 @@ function M.open_build(solution)
     }
 
     pickers.new({}, {
-        prompt_title = "Build Configuration for " .. solution.name,
+        prompt_title = "Build Configuration for " .. solution.sln_name,
         initial_mode = "normal",
         finder = finder,
         layout_strategy = "vertical",

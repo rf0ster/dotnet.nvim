@@ -4,15 +4,18 @@
 
 local M = {}
 
+local dotnet_manager = require("dotnet.manager")
+local dotnet_manager_solution_build = require("dotnet.manager.solution.build")
+
 function M.open()
-    local sln = require("dotnet.manager").load_solution()
+    local sln = dotnet_manager.load_solution()
     if not sln then
         return
     end
 
     local dotnet_cli = require("dotnet.cli")
     local commands = {
-        { name = "Build",        on_execute = function() dotnet_cli.build(sln.sln_path_abs) end },
+        { name = "Build",        on_execute = function() dotnet_manager_solution_build.open(sln) end },
         { name = "Clean",        on_execute = function() dotnet_cli.clean(sln.sln_path_abs) end },
         { name = "Restore",      on_execute = function() dotnet_cli.restore(sln.sln_path_abs) end },
         { name = "Test",         on_execute = function() dotnet_cli.mstest(sln.sln_path_abs) end },

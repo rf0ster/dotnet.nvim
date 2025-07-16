@@ -128,7 +128,7 @@ function M.open()
                 if not project then
                     return
                 end
-                require "dotnet.manager.projects.build".open_build(project)
+                require "dotnet.manager.projects.build".open(project)
             end)
             map("n", "c", function()
                 local project = actions_state.get_selected_entry().value

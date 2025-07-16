@@ -8,9 +8,9 @@ local pickers = require "telescope.pickers"
 local finders = require "telescope.finders"
 local actions_state = require "telescope.actions.state"
 
--- Given the project name, open the build manager
--- and allow the user to configure the build.
-function M.open_build(project)
+--- Given the project, open the build manager
+--- @param project table The project to open the build manager for
+function M.open(project)
     if not project then
         return
     end
