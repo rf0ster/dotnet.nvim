@@ -14,11 +14,11 @@
 
 local M  = {}
 
+local api_client = require "dotnet.nuget.api_client"
 local prompt = require "dotnet.nuget.prompt"
 local picker = require "dotnet.nuget.picker"
 local config = require "dotnet.nuget.config"
 local utils = require "dotnet.utils"
-local api = require "dotnet.nuget.api"
 local cli = require "dotnet.cli"
 
 function M.open(proj_file)
@@ -71,7 +71,7 @@ function M.open(proj_file)
             end
 
             local take = 2 * pkgs_h
-            local pkg_list = api.query(query, take) or {}
+            local pkg_list = api_client.get_search_query(query, take, false) or {}
             pkgs_picker.set_values(pkg_list)
         end,
     })

@@ -62,9 +62,7 @@ function M.create(opts)
             return
         end
 
-
         values = vals or {}
-
         local display_values = {}
         for _, val in ipairs(values) do
             table.insert(display_values, defaults.display(val))

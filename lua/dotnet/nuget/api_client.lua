@@ -1,14 +1,12 @@
 
-local curl = require "plenary.curl"
-local xml2lua = require("xml2lua")
-local handler = require("xmlhandler.tree")
-
 local M = {}
 
+local api = require "dotnet.nuget.api"
+
 --- Decodes an http response from Nuget APIs that return JSON data.
---- @param res table
-local function decode_json_response(res)
-    if res.status < 200 or 299 < res.status then
+--- @param res table|nil
+local function decode(res)
+    if not res or res.status < 200 or 299 < res.status then
         return nil
     end
 
@@ -17,16 +15,16 @@ local function decode_json_response(res)
 end
 
 --- Gets the service index for NuGet.
+--- If the service index has already
+--- been fetched, it returns the cached 
+--- value.
 --- @return table|nil
 function M.get_service_index()
     if M.service_index then
         return M.service_index
     end
 
-    local url = "https://api.nuget.org/v3/index.json"
-    local res = curl.get(url, { accept = "application/json" })
-
-    M.service_index = decode_json_response(res)
+    M.service_index = decode(api.get_service_index())
     return M.service_index
 end
 
@@ -53,19 +51,32 @@ end
 --- @param take integer
 --- @param prerelease boolean
 --- @return table|nil
-function M.search_query(query, take, prerelease)
+function M.get_search_query(query, take, prerelease)
     local url = M.get_service_url("SearchQueryService")
     if not url then
         return nil
     end
 
-    local uri = url .. "?q=" .. query .. "&take=" .. (take or 20)
-    if prerelease then
-        uri = uri .. "&prerelease=true"
+    local res = decode(api.get_search_query(url, query, take, prerelease))
+    if not res then
+        return {}
     end
 
-    local res = curl.get(uri, { accept = "application/json" })
-    return decode_json_response(res)
+    local results = {}
+    for _, item in ipairs(res.data) do
+        local pkg = {
+            id = item.id,
+            version = item.version,
+            description = item.description,
+            authors = item.authors,
+            icon_url = item.iconUrl,
+            project_url = item.projectUrl,
+            license_url = item.licenseUrl,
+        }
+        table.insert(results, pkg)
+    end
+
+    return results
 end
 
 --- Get the NuSpec file for a specific package and version.
@@ -76,22 +87,20 @@ function M.get_registration_base(package_id, version)
     if not service_url then
         return nil
     end
-
-    local url = service_url .. package_id:lower() .. "/" .. version:lower() .. ".json"
-    local res = curl.get(url, { accept = "application/json" })
-
-    return decode_json_response(res)
+    return decode(api.get_registration_base(service_url, package_id, version))
 end
 
 --- Put back the test function I had a little while ago
 function M.test(package_id, take)
-    local search_query = M.search_query(package_id, take, true)
+    local search_query = M.get_search_query(package_id, take, true)
     if search_query == nil then
         return
     end
 
+    print("Search results for " .. package_id .. ":")
     local pkg = nil
     for _, item in ipairs(search_query.data) do
+        print("  " .. item.id .. " version: " .. item.version)
         if item.id == package_id then
             pkg = item
             break
