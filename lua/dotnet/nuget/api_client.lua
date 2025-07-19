@@ -1,5 +1,11 @@
+--- Description: A module to interact with NuGet APIs.
+--- Provides caching of service index and search urls.
+--- Decodes JSON responses from the NuGet APIs.
 
-local M = {}
+local M = {
+    service_index = nil,
+    service_url = {}
+}
 
 local api = require "dotnet.nuget.api"
 
@@ -33,6 +39,10 @@ end
 --- @param type string
 --- @return string|nil
 function M.get_service_url(type)
+    if M.service_url[type] then
+        return M.service_url[type]
+    end
+
     local service_index = M.get_service_index()
     if not service_index then
         return nil
@@ -40,7 +50,8 @@ function M.get_service_url(type)
 
     for _, resource in ipairs(service_index.resources) do
         if resource["@type"] == type then
-            return resource["@id"]
+            M.service_url[type] = resource["@id"]
+            return M.service_url[type]
         end
     end
     return nil
