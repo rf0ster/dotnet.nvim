@@ -81,7 +81,8 @@ function M.open(proj_file)
                 end
             }
         },
-        on_change = function(_)
+        on_selection = function(pkg)
+            print(vim.inspect(pkg))
         end,
         display = function(pkg)
             if not pkg or not pkg.id then

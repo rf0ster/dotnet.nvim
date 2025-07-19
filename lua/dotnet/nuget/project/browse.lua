@@ -95,7 +95,7 @@ function M.open(proj_file)
                 end
             },
         },
-        on_change = function(pkg)
+        on_selection = function(pkg)
             if not M.view_bufnr then
                 return
             end

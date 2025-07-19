@@ -16,7 +16,8 @@ function M.create(opts)
         values = {},
         win_opts = utils.center_win(0.5, 0.5),
         keymaps = {},
-        on_change = function(_) end,
+        on_selection = function(_) end,
+        on_new_values = function(_) end,
         display = function(val) return val end,
     }
 
@@ -51,7 +52,7 @@ function M.create(opts)
     vim.api.nvim_create_autocmd("CursorMoved", {
         buffer = bufnr,
         callback = function()
-            defaults.on_change(get_selected_value())
+            defaults.on_selection(get_selected_value())
         end
     })
 
@@ -76,10 +77,11 @@ function M.create(opts)
 
         -- Call on_change for the first value
         if #values > 0 then
-            defaults.on_change(values[1])
+            defaults.on_selection(values[1])
         else
-            defaults.on_change(nil)
+            defaults.on_selection(nil)
         end
+        defaults.on_new_values(values)
     end
 
     set_values(defaults.values)
@@ -87,7 +89,8 @@ function M.create(opts)
         bufnr = bufnr,
         win_id = win_id,
         set_values = set_values,
-        on_change = defaults.on_change,
+        on_selection = defaults.on_selection,
+        on_new_values = defaults.on_new_values,
     }
 end
 

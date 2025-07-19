@@ -74,7 +74,7 @@ function M.open_tab(opt)
     elseif opt == 1 then
         M.tab = tab_i.open(M.proj_file)
     elseif opt == 2 then
-        M.tab = tab_u.open()
+        M.tab = tab_u.open(M.proj_file)
     end
 
     local bufs = {M.header.bufnr}

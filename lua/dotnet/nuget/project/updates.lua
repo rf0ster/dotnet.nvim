@@ -14,10 +14,14 @@
 
 local M  = {}
 
-local config = require "dotnet.nuget.config"
+local manager = require "dotnet.manager"
 local utils = require "dotnet.utils"
+local cli = require "dotnet.cli"
+local config = require "dotnet.nuget.config"
+local prompt = require "dotnet.nuget.prompt"
+local picker = require "dotnet.nuget.picker"
 
-function M.open()
+function M.open(proj_file)
     local d = utils.get_centered_win_dims(
         config.opts.ui.width,
         config.opts.ui.height
@@ -42,22 +46,53 @@ function M.open()
     local view_r = d.row + header_h + 2
     local view_c = d.col + search_w + 2
 
-    M.search_bufnr, M.search_win = utils.float_win("Search", {
-        height = search_h,
-        width = search_w,
-        row = search_r,
-        col = search_c,
-        style = config.opts.ui.style,
-        border = config.opts.ui.border,
+    local packages
+
+    M.search_bufnr, M.search_win = prompt.create({
+        title = "Search",
+        win_opts = {
+            height = search_h,
+            width = search_w,
+            row = search_r,
+            col = search_c,
+            style = config.opts.ui.style,
+            border = config.opts.ui.border,
+        },
+        on_change = function(_)
+        end,
     })
-    M.pkgs_bufnr, M.pkgs_win = utils.float_win("Packages", {
-        height = pkgs_h,
-        width = pkgs_w,
-        row = pkgs_r,
-        col = pkgs_c,
-        style = config.opts.ui.style,
-        border = config.opts.ui.border,
+
+    packages = picker.create({
+        title = "Packages",
+        values = {},
+        win_opts = {
+            height = pkgs_h,
+            width = pkgs_w,
+            row = pkgs_r,
+            col = pkgs_c,
+            style = config.opts.ui.style,
+            border = config.opts.ui.border,
+        },
+        keymaps = {
+            {
+                key = "u",
+                fn = function(pkg)
+                    cli.remove_package(proj_file, pkg.id)
+                end
+            }
+        },
+        on_selection = function(val)
+            print(vim.inspect(val))
+        end,
+        display = function(pkg)
+            if not pkg or not pkg.id then
+                return ""
+            end
+            return " " .. pkg.id
+        end,
     })
+
+    M.pkgs_bufnr, M.pkgs_win = packages.bufnr, packages.win_id
     M.view_bufnr, M.view_win = utils.float_win("View", {
         height = view_h,
         width = view_w,
@@ -66,6 +101,20 @@ function M.open()
         style = config.opts.ui.style,
         border = config.opts.ui.border,
     })
+
+    local pkgs = manager.get_nuget_pkgs(proj_file)
+    packages.set_values(pkgs)
+
+    -- Set Navigation Keymaps
+    local nav_to = function(k, from, to)
+        vim.keymap.set("n", k, function() vim.api.nvim_set_current_win(to) end, { buffer = from })
+    end
+
+    nav_to("fj", M.search_bufnr, M.pkgs_win)
+    nav_to("fl", M.search_bufnr, M.view_win)
+    nav_to("fk", M.pkgs_bufnr, M.search_win)
+    nav_to("fl", M.pkgs_bufnr, M.view_win)
+    nav_to("fh", M.view_bufnr, M.search_win)
 
     return {
         wins = { M.search_win, M.pkgs_win, M.view_win },
