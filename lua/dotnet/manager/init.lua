@@ -94,6 +94,30 @@ function M.load_solution(sln_file_path)
     return M
 end
 
+--- Function to retrieve the NuGet packages defined in a project file.
+--- @param project_file string The path to the project file (e.g., .csproj)
+function M.get_nuget_pkgs(project_file)
+    local f = io.open(project_file, "r")
+    if not f then
+        return nil
+    end
+
+    local content = f:read("*a")
+    f:close()
+
+    local packages = {}
+    for line in content:gmatch("[^\r\n]+") do
+        local id = line:match('<PackageReference Include="([^"]+)"')
+        local version = line:match('Version="([^"]+)"')
+        if id and version then
+            table.insert(packages, { id = id, version = version })
+        end
+    end
+
+    return packages
+end
+
+
 -- Prints the current solution information to the user.
 function M.print_solution_info()
     print("Solution Name: " .. (M.sln_name or ""))
