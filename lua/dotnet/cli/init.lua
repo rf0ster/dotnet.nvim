@@ -105,6 +105,13 @@ function M.add_package(project, package, version)
     return M.run_cmd("dotnet add " .. project .. " package " .. package .. add_param("version", version))
 end
 
+-- Removes a package from the given project.
+-- @param project string The project file path.
+-- @param package string The package name to remove.
+function M.remove_package(project, package)
+    return M.run_cmd("dotnet remove " .. project .. " package " .. package)
+end
+
 function M.get_history()
     return history
 end

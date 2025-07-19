@@ -14,45 +14,12 @@
 
 local M  = {}
 
+local manager = require "dotnet.manager"
+local cli = require "dotnet.cli"
 local prompt = require "dotnet.nuget.prompt"
 local picker = require "dotnet.nuget.picker"
 local config = require "dotnet.nuget.config"
 local utils = require "dotnet.utils"
-local job = require("plenary.job")
-
-local function get_nuget_packages(project_path, callback)
-  job:new({
-    command = "dotnet",
-    args = { "list", project_path, "package" },
-    on_exit = function(j, return_val)
-      if return_val ~= 0 then
-        vim.schedule(function()
-          vim.notify("Failed to list NuGet packages for " .. project_path, vim.log.levels.ERROR)
-        end)
-        return
-      end
-
-      local results = j:result()
-      local packages = {}
-
-      for _, line in ipairs(results) do
-        -- Match lines like: > Newtonsoft.Json             13.0.1      13.0.1
-        local name, req, res = line:match("^%s*>%s*(%S+)%s+(%S+)%s+(%S+)")
-        if name then
-          table.insert(packages, {
-            name = name,
-            requested = req,
-            resolved = res,
-          })
-        end
-      end
-
-      vim.schedule(function()
-        callback(packages)
-      end)
-    end,
-  }):start()
-end
 
 function M.open(proj_file)
     local d = utils.get_centered_win_dims(
@@ -106,19 +73,25 @@ function M.open(proj_file)
             style = config.opts.ui.style,
             border = config.opts.ui.border,
         },
-        keymaps = {},
+        keymaps = {
+            {
+                key = "u",
+                fn = function(pkg)
+                    cli.remove_package(proj_file, pkg.id)
+                end
+            }
+        },
         on_change = function(_)
         end,
         display = function(pkg)
-            if not pkg or not pkg.name then
+            if not pkg or not pkg.id then
                 return ""
             end
-            return " " .. pkg.name
+            return " " .. pkg.id
         end,
     })
-    M.pkgs_bufnr, M.pkgs_win = packages.bufnr, packages.win_id
-    packages.set_values({"...loading..."})
 
+    M.pkgs_bufnr, M.pkgs_win = packages.bufnr, packages.win_id
     M.view_bufnr, M.view_win = utils.float_win("View", {
         height = view_h,
         width = view_w,
@@ -128,9 +101,8 @@ function M.open(proj_file)
         border = config.opts.ui.border,
     })
 
-    get_nuget_packages(proj_file, function(pkgs)
-        packages.set_values(pkgs)
-    end)
+    local pkgs = manager.get_nuget_pkgs(proj_file)
+    packages.set_values(pkgs)
 
     -- Set Navigation Keymaps
     local nav_to = function(k, from, to)
@@ -142,8 +114,6 @@ function M.open(proj_file)
     nav_to("fk", M.pkgs_bufnr, M.search_win)
     nav_to("fl", M.pkgs_bufnr, M.view_win)
     nav_to("fh", M.view_bufnr, M.search_win)
-
-
 
     return {
         wins = { M.search_win, M.pkgs_win, M.view_win },
