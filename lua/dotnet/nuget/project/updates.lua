@@ -20,6 +20,7 @@ local cli = require "dotnet.cli"
 local config = require "dotnet.nuget.config"
 local prompt = require "dotnet.nuget.prompt"
 local picker = require "dotnet.nuget.picker"
+local api_client = require "dotnet.nuget.api_client"
 
 function M.open(proj_file)
     local d = utils.get_centered_win_dims(
@@ -82,7 +83,42 @@ function M.open(proj_file)
             }
         },
         on_selection = function(val)
-            print(vim.inspect(val))
+            if not val or not val.id then
+                return
+            end
+
+            vim.schedule(function()
+                -- Close the view window if it exists
+                if M.view_win and vim.api.nvim_win_is_valid(M.view_win) then
+                    local versions = api_client.get_versions(val.id) or {}
+                    if #versions == 0 then
+                        return
+                    end
+
+                    local latest_version = versions[#versions]
+                    local pkg_info = {
+                        id = val.id,
+                        version = val.version,
+                        latest_version = latest_version,
+                        versions = versions,
+                    }
+
+                    -- Set the view buffer with package details
+                    vim.api.nvim_buf_set_lines(M.view_bufnr, 0, -1, false, {
+                        " Package: " .. pkg_info.id,
+                        " Current Version: " .. pkg_info.version,
+                        " Latest Version: " .. pkg_info.latest_version,
+                        " Available Versions:",
+                        ""
+                    })
+
+                    -- Print the versions in the view buffer in reverse order
+                    for i = #pkg_info.versions, 1, -1 do
+                        local version = pkg_info.versions[i]
+                        vim.api.nvim_buf_set_lines(M.view_bufnr, -1, -1, false, { "   - " .. version })
+                    end
+                end
+            end)
         end,
         display = function(pkg)
             if not pkg or not pkg.id then
@@ -102,8 +138,25 @@ function M.open(proj_file)
         border = config.opts.ui.border,
     })
 
-    local pkgs = manager.get_nuget_pkgs(proj_file)
-    packages.set_values(pkgs)
+    -- Asynchronously fetch the list of packages with updates
+    vim.schedule(function()
+        local outdated_pkgs = {}
+        for _, pkg in ipairs(manager.get_nuget_pkgs(proj_file) or {}) do
+            local versions = api_client.get_versions(pkg.id) or {}
+            if #versions > 0 then
+                local latest_version = versions[#versions]
+                if pkg.version ~= latest_version then
+                    table.insert(outdated_pkgs, {
+                        id = pkg.id,
+                        version = pkg.version,
+                        latest_version = latest_version,
+                        versions = versions,
+                    })
+                end
+            end
+        end
+        packages.set_values(outdated_pkgs)
+    end)
 
     -- Set Navigation Keymaps
     local nav_to = function(k, from, to)

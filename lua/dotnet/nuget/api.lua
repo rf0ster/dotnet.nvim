@@ -38,7 +38,7 @@ end
 --- Get the service resource for a specific package and version.
 --- @param service_url string Service URL for the package resource
 --- @param package_id string Package ID
---- @param version string Package version
+--- @param version string|nil Package version
 function M.get_service_resource(service_url, package_id, version)
     local pkg = package_id:lower()
     local ver = (version or "index") .. ".json"
