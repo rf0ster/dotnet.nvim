@@ -26,11 +26,25 @@ function M.get_search_query(url, query, take, prerelease)
 end
 
 --- Get the NuSpec file for a specific package and version.
---- @param package_id string
+--- @param url string Service URL for the package metadata from the service index
+--- @param package_id string Package ID
+--- @param version string Package version
 --- @return table|nil
 function M.get_registration_base(url, package_id, version)
     url = url .. package_id:lower() .. "/" .. version:lower() .. ".json"
     return curl.get(url, { accept = "application/json" })
 end
+
+--- Get the service resource for a specific package and version.
+--- @param service_url string Service URL for the package resource
+--- @param package_id string Package ID
+--- @param version string Package version
+function M.get_service_resource(service_url, package_id, version)
+    local pkg = package_id:lower()
+    local ver = (version or "index") .. ".json"
+
+    return curl.get(service_url .. pkg .. "/" .. ver, { accept = "application/json" })
+end
+
 
 return M

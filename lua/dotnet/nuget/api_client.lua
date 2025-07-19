@@ -91,7 +91,7 @@ function M.get_search_query(query, take, prerelease)
 end
 
 --- Get the NuSpec file for a specific package and version.
---- @param package_id string
+--- @param package_id string ID of the package
 --- @return table|nil
 function M.get_registration_base(package_id, version)
     local service_url = M.get_service_url("RegistrationsBaseUrl")
@@ -101,33 +101,26 @@ function M.get_registration_base(package_id, version)
     return decode(api.get_registration_base(service_url, package_id, version))
 end
 
---- Put back the test function I had a little while ago
-function M.test(package_id, take)
-    local search_query = M.get_search_query(package_id, take, true)
-    if search_query == nil then
-        return
+--- Get versions for a specific package.
+--- @param package_id string ID of the package
+--- @return table|nil 
+function M.get_versions(package_id)
+    local service_url = M.get_service_url("PackageBaseAddress/3.0.0")
+    if not service_url then
+        return nil
     end
 
-    print("Search results for " .. package_id .. ":")
-    local pkg = nil
-    for _, item in ipairs(search_query.data) do
-        print("  " .. item.id .. " version: " .. item.version)
-        if item.id == package_id then
-            pkg = item
-            break
-        end
+    local res = decode(api.get_service_resource(service_url, package_id))
+    if not res or not res.versions then
+        return {}
     end
 
-    if pkg == nil then
-        return
-    end
-    print("Found package: " .. pkg.id .. " version: " .. pkg.version)
-
-    local nuspec = M.get_registration_base(pkg.id, pkg.version)
-    if nuspec == nil then
-        return
-    end
-    print("Nuspec for " .. pkg.id .. " version " .. pkg.version .. ":")
-    print(vim.inspect(nuspec))
+    return res.versions
 end
+
+--- Put back the test function I had a little while ago
+function M.test()
+    print(vim.inspect(M.get_versions("Newtonsoft.Json")))
+end
+
 return M
