@@ -51,7 +51,6 @@ function M.open(project)
         end,
     }):find()
 
-
 end
 
 return M

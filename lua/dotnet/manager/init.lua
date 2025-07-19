@@ -79,7 +79,8 @@ function M.load_solution(sln_file_path)
             local project_type = guid[project_type_guid]
             if project_type and project_type.is_proj then
                 table.insert(projects, {
-                    name = project_name .. ".csproj",
+                    name = project_name,
+                    ext = ".csproj",
                     guid = project_guid,
                     type = project_type.type,
                     path_rel = project_path:gsub("\\", "/"),
