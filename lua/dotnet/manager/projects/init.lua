@@ -153,11 +153,9 @@ function M.open()
                 dotnet_confirm.open({
                     prompt_title = "Delete Project",
                     prompt = {"Delete " .. project.path_rel ..  " from " .. sln_info.sln_name .. "?"},
-                    on_close = function(answer)
-                        if answer == "yes" then
-                            dotnet_cli.sln_remove(sln_info.sln_file, project.path_abs)
-                            dotnet_manager.load_solution()
-                        end
+                    on_confirm = function()
+                        dotnet_cli.sln_remove(sln_info.sln_file, project.path_abs)
+                        dotnet_manager.load_solution()
                     end
                 })
             end)

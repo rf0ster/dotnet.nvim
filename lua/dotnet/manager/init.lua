@@ -34,6 +34,7 @@ local guid = require("dotnet.manager.guid")
 --- @param sln_file_path string|nil The path to the solution file
 --- @return table|nil table Module the solution file path and name set, and the projects loaded.
 function M.load_solution(sln_file_path)
+    local manager_solution = require("dotnet.manager.solution")
     sln_file_path = sln_file_path or vim.fn.getcwd()
 
     -- Check if the provided path is a file or a directory
@@ -51,6 +52,7 @@ function M.load_solution(sln_file_path)
             sln_file_path = files[1]
         else
             vim.api.nvim_echo({{"[Warning] No solution file found in the specified directory", "WarningMsg"}}, true, {})
+            manager_solution.create()
             return nil
         end
     end
@@ -63,6 +65,7 @@ function M.load_solution(sln_file_path)
     local sln_content = vim.fn.readfile(sln_file_path)
     if not sln_content or #sln_content == 0 then
         vim.api.nvim_echo({{"[Error] Solution file is empty or could not be read", "ErrorMsg"}}, true, {})
+        manager_solution.create()
         return
     end
 

@@ -2,6 +2,8 @@ local M = {}
 
 function M.open(opts)
     local prompt = opts.prompt or {"Are you sure?"}
+    local on_confirm = opts.on_confirm or function() end
+    local on_cancel = opts.on_cancel or function() end
 
 	local height = #prompt + 3
 	local width = 25
@@ -49,25 +51,20 @@ function M.open(opts)
     vim.api.nvim_buf_set_keymap(bufnr, 'n', '<Right>', '<nop>', { noremap = true, silent = true })
     vim.bo[bufnr].modifiable = false
 
-    local function close(answer)
-        vim.api.nvim_win_close(win, true)
-        if opts.on_close then
-            opts.on_close(answer)
-        end
-    end
-
     vim.api.nvim_buf_set_keymap(bufnr, "n", "y", "", {
         noremap = true,
         silent = true,
         callback = function()
-            close("yes")
+            vim.api.nvim_win_close(win, true)
+            on_confirm()
         end
     })
     vim.api.nvim_buf_set_keymap(bufnr, "n", "n", "", {
         noremap = true,
         silent = true,
         callback = function()
-            close("no")
+            vim.api.nvim_win_close(win, true)
+            on_cancel()
         end
     })
 end

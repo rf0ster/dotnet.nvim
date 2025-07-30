@@ -33,6 +33,10 @@ local function add_param(name, value)
     end
 end
 
+function M.new_solution(name)
+    return shell_command("dotnet new sln -n " .. name)
+end
+
 function M.sln_list(sln_file)
     return shell_command("dotnet sln " .. sln_file .. " list")
 end
