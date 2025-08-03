@@ -17,7 +17,6 @@ local M  = {}
 local api_client = require "dotnet.nuget.api_client"
 local config = require "dotnet.nuget.config"
 local utils = require "dotnet.utils"
-local cli = require "dotnet.cli"
 local nuget_picker = require "dotnet.nuget.nuget_picker"
 
 function M.open(proj_file)
@@ -27,16 +26,35 @@ function M.open(proj_file)
     )
     local header_h = config.defaults.ui.header_h
 
-    local picker_h = d.height - header_h - 4
+    -- Define output window height before creating the picke
+    -- so that it can be used in the picker and view dimensions.
+    local output_h = 5
+    local output_w = d.width
+
+    local picker_h = d.height - header_h - output_h - 4
     local picker_w = math.floor(d.width / 2) - 2
     local picker_r = d.row + header_h + 2
     local picker_c = d.col
 
     -- Create view window for a single package
-    local view_h = d.height - header_h - 4
+    local view_h = d.height - header_h - output_h - 4
     local view_w = math.floor(d.width / 2)
     local view_r = d.row + header_h + 2
     local view_c = d.col + picker_w + 2
+
+    -- Define the rest of the output window dimensions
+    -- based on the picker and view dimensions.
+    local output_r = picker_r + picker_h + 2
+    local output_c = d.col
+
+    local output_bufnr, output_win = utils.float_win("Output", {
+        height = output_h,
+        width = output_w,
+        row = output_r,
+        col = output_c,
+        style = config.opts.ui.style,
+        border = config.opts.ui.border,
+    })
 
     local pkgs_picker = nuget_picker.create({
         row = picker_r,
@@ -99,7 +117,11 @@ function M.open(proj_file)
             {
                 key = "<CR>",
                 callback = function(val)
-                    cli.add_package(proj_file, val.value.id, val.value.version)
+                    local DotnetCli = require "dotnet.cli.cli"
+                    local options = require "dotnet.cli.cli_opts"
+
+                    local cli = DotnetCli:new(options.smart_output_opts(output_bufnr, output_win))
+                    cli:add_package(proj_file, val.value.id, val.value.version)
                 end
             }
         }
@@ -109,6 +131,8 @@ function M.open(proj_file)
     M.search_win = pkgs_picker.search_win
     M.results_bufnr = pkgs_picker.results_bufnr
     M.results_win = pkgs_picker.results_win
+    M.output_bufnr = output_bufnr
+    M.output_win = output_win
 
     M.view_bufnr, M.view_win = utils.float_win("View", {
         height = view_h,
@@ -124,8 +148,8 @@ function M.open(proj_file)
     vim.keymap.set("n", "<leader>h", function() vim.api.nvim_set_current_win(M.search_win) end, { buffer = M.view_bufnr })
 
     return {
-        wins = { M.search_win, M.results_win, M.view_win },
-        bufs = { M.search_bufnr, M.results_bufnr, M.view_bufnr },
+        wins = { M.search_win, M.results_win, M.view_win, M.output_win },
+        bufs = { M.search_bufnr, M.results_bufnr, M.view_bufnr, M.output_bufnr },
         close = function()
             if M.search_win and vim.api.nvim_win_is_valid(M.search_win) then
                 vim.api.nvim_win_close(M.search_win, true)
@@ -136,6 +160,9 @@ function M.open(proj_file)
             if M.view_win and vim.api.nvim_win_is_valid(M.view_win) then
                 vim.api.nvim_win_close(M.view_win, true)
             end
+            if M.output_win and vim.api.nvim_win_is_valid(M.output_win) then
+                vim.api.nvim_win_close(M.output_win, true)
+            end
             if M.search_bufnr and vim.api.nvim_buf_is_valid(M.search_bufnr) then
                 vim.api.nvim_buf_delete(M.search_bufnr, { force = true })
             end
@@ -145,12 +172,17 @@ function M.open(proj_file)
             if M.view_bufnr and vim.api.nvim_buf_is_valid(M.view_bufnr) then
                 vim.api.nvim_buf_delete(M.view_bufnr, { force = true })
             end
+            if M.output_bufnr and vim.api.nvim_buf_is_valid(M.output_bufnr) then
+                vim.api.nvim_buf_delete(M.output_bufnr, { force = true })
+            end
             M.search_bufnr = nil
             M.search_win = nil
             M.results_bufnr = nil
             M.results_win = nil
             M.view_bufnr = nil
             M.view_win = nil
+            M.output_bufnr = nil
+            M.output_win = nil
         end
     }
 end

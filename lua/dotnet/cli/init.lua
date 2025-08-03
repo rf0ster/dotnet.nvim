@@ -120,4 +120,47 @@ function M.get_history()
     return history
 end
 
+
+local win, buf
+local winTwo, bufTwo
+
+function M.test_cli(cmd, num)
+    local DotnetCli = require "dotnet.cli.cli"
+    local cli_opts = require "dotnet.cli.cli_opts"
+
+    local opts
+    if num == 1 then
+        opts = cli_opts.smart_output_opts(win, buf)
+    else
+        opts = cli_opts.smart_output_opts(winTwo, bufTwo)
+    end
+    local cli = DotnetCli:new(opts)
+
+    if cmd == "build" then
+        cli:build()
+    elseif cmd == "restore" then
+        cli:restore()
+    elseif cmd == "clean" then
+        cli:clean()
+    end
+end
+
+function M.create_win()
+    buf, win = require "dotnet.utils".float_win("Dotnet CLI", {
+        height = 80,
+        width = 80,
+        row = 5,
+        col = 5,
+        style = "minimal",
+    })
+end
+function M.create_win_two()
+    bufTwo, winTwo = require "dotnet.utils".float_win("Dotnet CLI 2", {
+        height = 80,
+        width = 50,
+        row = 5,
+        col = 90,
+        style = "minimal",
+    })
+end
 return M

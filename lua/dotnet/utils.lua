@@ -105,6 +105,10 @@ end
 -- for lines that are wrapped. Each resulting line will always be less
 -- than or equal to the specified width.
 function M.split_smart(str, width, pad_left, pad_right, indent)
+    if not str or str == "" then
+        return { "" }
+    end
+
     indent = indent or 0
     pad_left = pad_left or 0
     pad_right = pad_right or 0
