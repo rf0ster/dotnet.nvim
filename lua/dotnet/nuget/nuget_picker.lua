@@ -81,7 +81,8 @@ function M.create(opts)
         end
         vim.api.nvim_win_set_cursor(results_win, cur)
 
-        on_selected(get_selected_value())
+        local selected_value = get_selected_value()
+        on_selected(selected_value)
     end
 
     vim.api.nvim_buf_set_keymap(search_bufnr, "n", "j", '', {
@@ -159,6 +160,11 @@ function M.create(opts)
     M.search_win = search_win
     M.results_bufnr = results_bufnr
     M.results_win = results_win
+
+    -- Schedule a task to ensure the results window is updated
+    vim.schedule(function()
+        wrapped_on_change()
+    end)
 
     return M.get_state()
 end

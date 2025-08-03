@@ -7,6 +7,7 @@ local M = {
     service_url = {}
 }
 
+local curl = require "plenary.curl"
 local api = require "dotnet.nuget.api"
 
 --- Decodes an http response from Nuget APIs that return JSON data.
@@ -118,9 +119,38 @@ function M.get_versions(package_id)
     return res.versions
 end
 
---- Put back the test function I had a little while ago
-function M.test()
-    print(vim.inspect(M.get_versions("Newtonsoft.Json")))
+--- Get versions for a specific package.
+--- @param package_id string ID of the package
+--- @return table|nil 
+function M.get_pkg_info(package_id, version)
+    local service_url = M.get_service_url("RegistrationsBaseUrl")
+    if not service_url then
+        return nil
+    end
+
+    local res = decode(api.get_registration_base(service_url, package_id, version))
+    if not res then
+        return nil
+    end
+
+    local pkg_info = res.catalogEntry
+    if type(pkg_info) == "string" then
+        pkg_info = decode(curl.get(res.catalogEntry, { accept = "application/json" }))
+    end
+
+    if not pkg_info then
+        return nil
+    end
+
+    return {
+        id = pkg_info.id,
+        version = pkg_info.version,
+        description = pkg_info.description or "",
+        authors = pkg_info.authors or "",
+        icon_url = pkg_info.iconUrl or "",
+        project_url = pkg_info.projectUrl or "",
+        license_url = pkg_info.licenseUrl or "",
+    }
 end
 
 return M

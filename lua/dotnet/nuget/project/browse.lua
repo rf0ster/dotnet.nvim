@@ -84,19 +84,21 @@ function M.open(proj_file)
             vim.api.nvim_buf_set_lines(M.view_bufnr, 0, 0, false, {
                 " ID: " .. val.value.id,
                 " Version: " .. val.value.version,
+                " Authors: " .. (val.value.authors[1] or "Unknown"),
                 " Description: ",
             })
 
             local w = vim.api.nvim_win_get_width(M.view_win)
             local s = utils.split_smart(val.value.description, w, 3, 1)
-            vim.api.nvim_buf_set_lines(M.view_bufnr, 3, -1, false, s)
+
+            local last_line = vim.api.nvim_buf_line_count(M.view_bufnr)
+            vim.api.nvim_buf_set_lines(M.view_bufnr, last_line - 1, -1, false, s)
             vim.api.nvim_buf_set_option(M.view_bufnr, "modifiable", false)
         end,
         keymaps = {
             {
                 key = "<CR>",
                 callback = function(val)
-                    print("Selected package: " .. val.value.id .. "@" .. val.value.version)
                     cli.add_package(proj_file, val.value.id, val.value.version)
                 end
             }
@@ -118,8 +120,8 @@ function M.open(proj_file)
     })
 
     -- Set Navigation Keymaps
-    vim.keymap.set("n", "fl", function() vim.api.nvim_set_current_win(M.view_win) end, { buffer = M.search_bufnr })
-    vim.keymap.set("n", "fh", function() vim.api.nvim_set_current_win(M.search_win) end, { buffer = M.view_bufnr })
+    vim.keymap.set("n", "<leader>l", function() vim.api.nvim_set_current_win(M.view_win) end, { buffer = M.search_bufnr })
+    vim.keymap.set("n", "<leader>h", function() vim.api.nvim_set_current_win(M.search_win) end, { buffer = M.view_bufnr })
 
     return {
         wins = { M.search_win, M.results_win, M.view_win },
