@@ -144,8 +144,11 @@ function M.open(proj_file)
     })
 
     -- Set Navigation Keymaps
-    vim.keymap.set("n", "<leader>l", function() vim.api.nvim_set_current_win(M.view_win) end, { buffer = M.search_bufnr })
-    vim.keymap.set("n", "<leader>h", function() vim.api.nvim_set_current_win(M.search_win) end, { buffer = M.view_bufnr })
+    vim.keymap.set("n", "fl", function() vim.api.nvim_set_current_win(M.view_win) end, { buffer = M.search_bufnr })
+    vim.keymap.set("n", "fh", function() vim.api.nvim_set_current_win(M.search_win) end, { buffer = M.view_bufnr })
+    vim.keymap.set("n", "fj", function() vim.api.nvim_set_current_win(M.output_win) end, { buffer = M.search_bufnr })
+    vim.keymap.set("n", "fj", function() vim.api.nvim_set_current_win(M.output_win) end, { buffer = M.view_bufnr })
+    vim.keymap.set("n", "fk", function() vim.api.nvim_set_current_win(M.search_win) end, { buffer = M.output_bufnr })
 
     return {
         wins = { M.search_win, M.results_win, M.view_win, M.output_win },
