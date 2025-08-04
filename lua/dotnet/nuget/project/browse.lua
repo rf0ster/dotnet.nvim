@@ -19,6 +19,10 @@ local config = require "dotnet.nuget.config"
 local utils = require "dotnet.utils"
 local nuget_picker = require "dotnet.nuget.nuget_picker"
 
+local state = {
+    search_term = "",
+}
+
 function M.open(proj_file)
     local d = utils.get_centered_win_dims(
         config.opts.ui.width,
@@ -28,7 +32,7 @@ function M.open(proj_file)
 
     -- Define output window height before creating the picke
     -- so that it can be used in the picker and view dimensions.
-    local output_h = 5
+    local output_h = 6
     local output_w = d.width
 
     local picker_h = d.height - header_h - output_h - 4
@@ -62,7 +66,9 @@ function M.open(proj_file)
         width = picker_w,
         height = picker_h,
         debounce = 300,
+        default_search_term = state.search_term,
         map_to_results = function(val)
+            state.search_term = val
             if not val or val == "" then
                 return {}
             end

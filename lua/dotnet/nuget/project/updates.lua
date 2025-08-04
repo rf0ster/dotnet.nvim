@@ -14,121 +14,138 @@
 
 local M  = {}
 
+
 local manager = require "dotnet.manager"
-local utils = require "dotnet.utils"
-local cli = require "dotnet.cli"
 local config = require "dotnet.nuget.config"
-local prompt = require "dotnet.nuget.prompt"
-local picker = require "dotnet.nuget.picker"
-local api_client = require "dotnet.nuget.api_client"
+local utils = require "dotnet.utils"
+local nuget_picker = require "dotnet.nuget.nuget_picker"
+local fuzzy = require "dotnet.nuget.fuzzy"
+local api_client_cache = require "dotnet.nuget.api_client_cache"
 
 function M.open(proj_file)
     local d = utils.get_centered_win_dims(
         config.opts.ui.width,
         config.opts.ui.height
     )
+    local pkgs = manager.get_nuget_pkgs(proj_file)
+
     local header_h = config.defaults.ui.header_h
 
-    -- Create search prompt dimensions
-    local search_h = 1
-    local search_w = math.floor(d.width / 2) - 2
-    local search_r = d.row + header_h + 2
-    local search_c = d.col
+    -- Define output window height before creating the picke
+    -- so that it can be used in the picker and view dimensions.
+    local output_h = 6
+    local output_w = d.width
 
-    -- Create packages picker dimensions
-    local pkgs_h = d.height - header_h - search_h - 6
-    local pkgs_w = search_w
-    local pkgs_r = search_r + search_h + 2
-    local pkgs_c = search_c
+    -- Create the package picker dimensions
+    local picker_h = d.height - header_h - output_h - 4
+    local picker_w = math.floor(d.width / 2) - 2
+    local picker_r = d.row + header_h + 2
+    local picker_c = d.col
 
     -- Create view window for a single package
-    local view_h = d.height - header_h - 4
+    local view_h = d.height - header_h - output_h - 4
     local view_w = math.floor(d.width / 2)
     local view_r = d.row + header_h + 2
-    local view_c = d.col + search_w + 2
+    local view_c = d.col + picker_w + 2
 
-    local packages
+    -- Define the rest of the output window dimensions
+    -- based on the picker and view dimensions.
+    local output_r = picker_r + picker_h + 2
+    local output_c = d.col
 
-    M.search_bufnr, M.search_win = prompt.create({
-        title = "Search",
-        win_opts = {
-            height = search_h,
-            width = search_w,
-            row = search_r,
-            col = search_c,
-            style = config.opts.ui.style,
-            border = config.opts.ui.border,
-        },
-        on_change = function(_)
-        end,
+    local output_bufnr, output_win = utils.float_win("Output", {
+        height = output_h,
+        width = output_w,
+        row = output_r,
+        col = output_c,
+        style = config.opts.ui.style,
+        border = config.opts.ui.border,
     })
 
-    packages = picker.create({
-        title = "Packages",
-        values = {},
-        win_opts = {
-            height = pkgs_h,
-            width = pkgs_w,
-            row = pkgs_r,
-            col = pkgs_c,
-            style = config.opts.ui.style,
-            border = config.opts.ui.border,
-        },
-        keymaps = {
-            {
-                key = "u",
-                fn = function(pkg)
-                    cli.remove_package(proj_file, pkg.id)
+    local pkgs_picker = nuget_picker.create({
+        row = picker_r,
+        col = picker_c,
+        width = picker_w,
+        height = picker_h,
+        debounce = 300,
+        values = { nil },
+        map_to_results = function(val)
+            local filtered_pkgs = fuzzy.filter(pkgs, val)
+            if not filtered_pkgs or #filtered_pkgs == 0 then
+                return {}
+            end
+
+            local outdated_pkgs = {}
+            for _, pkg in ipairs(filtered_pkgs) do
+                local versions = api_client_cache.get_pkg_versions(pkg.id)
+                if versions and #versions > 0 and versions[#versions] ~= pkg.version then
+                    table.insert(outdated_pkgs, {
+                        display = pkg.id .. " (" .. pkg.version .. " -> " .. versions[#versions] .. ")",
+                        value = {
+                            id = pkg.id,
+                            version = pkg.version,
+                            latest_version = versions[#versions],
+                        }
+                    })
                 end
-            }
-        },
-        on_selection = function(val)
-            if not val or not val.id then
+
+            end
+
+            return outdated_pkgs
+        end,
+        on_selected = function(val)
+            if not M.view_bufnr then
+                return
+            end
+            if not val then
+                vim.api.nvim_buf_set_option(M.view_bufnr, "modifiable", true)
+                vim.api.nvim_buf_set_lines(M.view_bufnr, 0, -1, false, {})
+                vim.api.nvim_buf_set_option(M.view_bufnr, "modifiable", false)
                 return
             end
 
-            vim.schedule(function()
-                -- Close the view window if it exists
-                if M.view_win and vim.api.nvim_win_is_valid(M.view_win) then
-                    local versions = api_client.get_versions(val.id) or {}
-                    if #versions == 0 then
-                        return
-                    end
-
-                    local latest_version = versions[#versions]
-                    local pkg_info = {
-                        id = val.id,
-                        version = val.version,
-                        latest_version = latest_version,
-                        versions = versions,
-                    }
-
-                    -- Set the view buffer with package details
-                    vim.api.nvim_buf_set_lines(M.view_bufnr, 0, -1, false, {
-                        " Package: " .. pkg_info.id,
-                        " Current Version: " .. pkg_info.version,
-                        " Latest Version: " .. pkg_info.latest_version,
-                        " Available Versions:",
-                        ""
-                    })
-
-                    -- Print the versions in the view buffer in reverse order
-                    for i = #pkg_info.versions, 1, -1 do
-                        local version = pkg_info.versions[i]
-                        vim.api.nvim_buf_set_lines(M.view_bufnr, -1, -1, false, { "   - " .. version })
-                    end
-                end
-            end)
-        end,
-        display = function(pkg)
-            if not pkg or not pkg.id then
-                return ""
+            local pkg = api_client_cache.get_pkg_info(val.value.id, val.value.version)
+            if not pkg then
+                return
             end
-            return " " .. pkg.id
+
+            vim.api.nvim_buf_set_option(M.view_bufnr, "modifiable", true)
+            vim.api.nvim_buf_set_lines(M.view_bufnr, 0, -1, false, {})
+            vim.api.nvim_buf_set_lines(M.view_bufnr, 0, 0, false, {
+                " ID: " .. pkg.id,
+                " Version: " .. pkg.version,
+                " Authors: " .. (pkg.authors or "Unknown"),
+                " Description: ",
+            })
+
+            local w = vim.api.nvim_win_get_width(M.view_win)
+            local s = utils.split_smart(pkg.description, w, 3, 1)
+
+            local last_line = vim.api.nvim_buf_line_count(M.view_bufnr)
+            vim.api.nvim_buf_set_lines(M.view_bufnr, last_line - 1, -1, false, s)
+            vim.api.nvim_buf_set_option(M.view_bufnr, "modifiable", false)
         end,
+        keymaps = {
+            {
+                key = "<CR>",
+                callback = function(val)
+                    local DotnetCli = require "dotnet.cli.cli"
+                    local options = require "dotnet.cli.cli_opts"
+
+                    local cli = DotnetCli:new(options.smart_output_opts(output_bufnr, output_win))
+                    cli:add_package(proj_file, val.value.id, val.value.latest_version)
+                end
+            }
+        }
     })
 
-    M.pkgs_bufnr, M.pkgs_win = packages.bufnr, packages.win_id
+    M.search_bufnr = pkgs_picker.search_bufnr
+    M.search_win = pkgs_picker.search_win
+    M.results_bufnr = pkgs_picker.results_bufnr
+    M.results_win = pkgs_picker.results_win
+    M.output_bufnr = output_bufnr
+    M.output_win = output_win
+
     M.view_bufnr, M.view_win = utils.float_win("View", {
         height = view_h,
         width = view_w,
@@ -138,63 +155,48 @@ function M.open(proj_file)
         border = config.opts.ui.border,
     })
 
-    -- Asynchronously fetch the list of packages with updates
-    vim.schedule(function()
-        local outdated_pkgs = {}
-        for _, pkg in ipairs(manager.get_nuget_pkgs(proj_file) or {}) do
-            local versions = api_client.get_versions(pkg.id) or {}
-            if #versions > 0 then
-                local latest_version = versions[#versions]
-                if pkg.version ~= latest_version then
-                    table.insert(outdated_pkgs, {
-                        id = pkg.id,
-                        version = pkg.version,
-                        latest_version = latest_version,
-                        versions = versions,
-                    })
-                end
-            end
-        end
-        packages.set_values(outdated_pkgs)
-    end)
-
     -- Set Navigation Keymaps
-    local nav_to = function(k, from, to)
-        vim.keymap.set("n", k, function() vim.api.nvim_set_current_win(to) end, { buffer = from })
-    end
+    vim.keymap.set("n", "fl", function() vim.api.nvim_set_current_win(M.view_win) end, { buffer = M.search_bufnr })
+    vim.keymap.set("n", "fh", function() vim.api.nvim_set_current_win(M.search_win) end, { buffer = M.view_bufnr })
+    vim.keymap.set("n", "fj", function() vim.api.nvim_set_current_win(M.output_win) end, { buffer = M.search_bufnr })
+    vim.keymap.set("n", "fj", function() vim.api.nvim_set_current_win(M.output_win) end, { buffer = M.view_bufnr })
+    vim.keymap.set("n", "fk", function() vim.api.nvim_set_current_win(M.search_win) end, { buffer = M.output_bufnr })
 
-    nav_to("fj", M.search_bufnr, M.pkgs_win)
-    nav_to("fl", M.search_bufnr, M.view_win)
-    nav_to("fk", M.pkgs_bufnr, M.search_win)
-    nav_to("fl", M.pkgs_bufnr, M.view_win)
-    nav_to("fh", M.view_bufnr, M.search_win)
 
     return {
-        wins = { M.search_win, M.pkgs_win, M.view_win },
-        bufs = { M.search_bufnr, M.pkgs_bufnr, M.view_bufnr },
+        wins = { M.search_win, M.results_win, M.view_win, M.output_win },
+        bufs = { M.search_bufnr, M.results_bufnr, M.view_bufnr, M.output_bufnr },
         close = function()
             if M.search_win and vim.api.nvim_win_is_valid(M.search_win) then
                 vim.api.nvim_win_close(M.search_win, true)
             end
-            if M.pkgs_win and vim.api.nvim_win_is_valid(M.pkgs_win) then
-                vim.api.nvim_win_close(M.pkgs_win, true)
+            if M.results_win and vim.api.nvim_win_is_valid(M.results_win) then
+                vim.api.nvim_win_close(M.results_win, true)
             end
             if M.view_win and vim.api.nvim_win_is_valid(M.view_win) then
                 vim.api.nvim_win_close(M.view_win, true)
             end
+            if M.output_win and vim.api.nvim_win_is_valid(M.output_win) then
+                vim.api.nvim_win_close(M.output_win, true)
+            end
             if M.search_bufnr and vim.api.nvim_buf_is_valid(M.search_bufnr) then
                 vim.api.nvim_buf_delete(M.search_bufnr, { force = true })
             end
-            if M.pkgs_bufnr and vim.api.nvim_buf_is_valid(M.pkgs_bufnr) then
-                vim.api.nvim_buf_delete(M.pkgs_bufnr, { force = true })
+            if M.results_bufnr and vim.api.nvim_buf_is_valid(M.results_bufnr) then
+                vim.api.nvim_buf_delete(M.results_bufnr, { force = true })
             end
             if M.view_bufnr and vim.api.nvim_buf_is_valid(M.view_bufnr) then
                 vim.api.nvim_buf_delete(M.view_bufnr, { force = true })
             end
+            if M.output_bufnr and vim.api.nvim_buf_is_valid(M.output_bufnr) then
+                vim.api.nvim_buf_delete(M.output_bufnr, { force = true })
+            end
+            M.output_bufnr = nil
+            M.output_win = nil
             M.search_bufnr = nil
             M.search_win = nil
-            M.pkgs_bufnr = nil
-            M.pkgs_win = nil
+            M.results_bufnr = nil
+            M.results_win = nil
             M.view_bufnr = nil
             M.view_win = nil
         end

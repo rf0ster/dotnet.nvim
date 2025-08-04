@@ -19,7 +19,11 @@ function M.fuzzy_match(needle, haystack)
 end
 
 -- Filter array using fuzzy match
-function M.fuzzy_filter(values, search)
+function M.filter(values, search)
+  if not search or search == "" then
+    return values
+  end
+
   local results = {}
   for _, val in ipairs(values) do
     if M.fuzzy_match(search, val.text) then

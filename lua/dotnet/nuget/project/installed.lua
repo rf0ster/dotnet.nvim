@@ -32,7 +32,7 @@ function M.open(proj_file)
 
     -- Define output window height before creating the picke
     -- so that it can be used in the picker and view dimensions.
-    local output_h = 5
+    local output_h = 6
     local output_w = d.width
 
     -- Create the package picker dimensions
@@ -79,7 +79,7 @@ function M.open(proj_file)
                 else
                     for _, pkg in ipairs(pkgs or {}) do
                         if pkg and pkg.id and pkg.version then
-                            if fuzzy.fuzzy_match(query, pkg.id) then
+                            if fuzzy.filter(query, pkg.id) then
                                 table.insert(filtered_pkgs, pkg)
                             end
                         end

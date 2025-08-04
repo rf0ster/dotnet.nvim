@@ -10,6 +10,7 @@ function M.create(opts)
     local on_selected = opts.on_selected or function(_) end
 
     local debounce = opts.debounce or 0
+    local default_search_term = opts.default_search_term or ""
 
     --- Create the search prompt. This buffer is used
     --- as the input for the search term in the picker.
@@ -160,6 +161,11 @@ function M.create(opts)
     M.search_win = search_win
     M.results_bufnr = results_bufnr
     M.results_win = results_win
+
+    -- Set the initial search term if provided
+    if default_search_term and default_search_term ~= "" then
+        vim.api.nvim_buf_set_lines(search_bufnr, 0, -1, false, { default_search_term })
+    end
 
     -- Schedule a task to ensure the results window is updated
     vim.schedule(function()

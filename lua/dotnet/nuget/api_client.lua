@@ -128,7 +128,7 @@ function M.get_pkg_info(package_id, version)
         return nil
     end
 
-    local res = decode(api.get_registration_base(service_url, package_id, version))
+    local res = decode(api.get_service_resource(service_url, package_id, version))
     if not res then
         return nil
     end
