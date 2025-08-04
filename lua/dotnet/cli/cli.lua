@@ -110,7 +110,6 @@ end
 --- @param package string The package name to add.
 --- @param version string|nil The package version to add. If nil, the latest version
 function DotnetCli:add_package(project, package, version)
-    print(vim.inspect(self))
     self:run_cmd("dotnet add " .. project .. " package " .. package .. add_param("version", version))
 end
 

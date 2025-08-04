@@ -20,12 +20,10 @@ local utils = require "dotnet.utils"
 local nuget_picker = require "dotnet.nuget.nuget_picker"
 local fuzzy = require "dotnet.nuget.fuzzy"
 local api_client_cache = require "dotnet.nuget.api_client_cache"
+local window = require "dotnet.nuget.window"
 
 function M.open(proj_file)
-    local d = utils.get_centered_win_dims(
-        config.opts.ui.width,
-        config.opts.ui.height
-    )
+    local d = window.get_dimensions()
     local pkgs = manager.get_nuget_pkgs(proj_file)
 
     local header_h = config.defaults.ui.header_h

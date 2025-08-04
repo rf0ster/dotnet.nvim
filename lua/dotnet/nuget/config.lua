@@ -14,7 +14,7 @@ M.opts = {
 -- configuration that is not user configurable
 M.defaults = {
     ui = {
-        header_h = 2, -- Height of the header component.
+        header_h = 1, -- Height of the header component.
     }
 }
 

@@ -41,6 +41,10 @@ function M.get_pkg_versions(package_id)
         M.cached_pkgs[package_id] = {}
     end
 
+    if M.cached_pkgs[package_id].versions then
+        return M.cached_pkgs[package_id].versions
+    end
+
     local versions = api_client.get_versions(package_id)
     if versions then
         M.cached_pkgs[package_id].versions = versions
