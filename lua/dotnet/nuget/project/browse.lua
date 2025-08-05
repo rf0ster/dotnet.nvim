@@ -49,21 +49,6 @@ function M.open(proj_file)
     local output_r = picker_r + picker_h + 2
     local output_c = d.col
 
-    print(vim.inspect({
-        picker_h = picker_h,
-        picker_w = picker_w,
-        picker_r = picker_r,
-        picker_c = picker_c,
-        view_h = view_h,
-        view_w = view_w,
-        view_r = view_r,
-        view_c = view_c,
-        output_h = output_h,
-        output_w = output_w,
-        output_r = output_r,
-        output_c = output_c,
-    }))
-
     local output_bufnr, output_win = utils.float_win("Output", {
         height = output_h,
         width = output_w,

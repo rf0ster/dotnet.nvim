@@ -144,6 +144,14 @@ function M.open()
                 end
                 dotnet_cli.restore(project.path_abs)
             end)
+            map("n", "p", function()
+                local project = actions_state.get_selected_entry().value
+                if not project then
+                    return
+                end
+                local cli = require("dotnet.cli.cli"):new({ toggleterm = true })
+                cli:run_project(project.path_abs)
+            end)
             map("n", "d", function()
                 local project = actions_state.get_selected_entry().value
                 if not project then

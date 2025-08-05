@@ -13,11 +13,35 @@ function DotnetCli:new(opts)
 
     instance.history = {}
     instance.on_start = opts.on_start or function() end
-    instance.stdout = opts.stdout or function(_, data, _) end
-    instance.stderr = opts.stderr or function(_, data, _) end
-    instance.on_exit = opts.on_exit or function() end
-    instance.stdout_buffered = opts.stdout_buffered or false
-    instance.stderr_buffered = opts.stderr_buffered or false
+
+    if opts.toggleterm then
+        instance.run_cmd_fn = function(cmd)
+            instance.on_start()
+            local term = require("toggleterm.terminal").Terminal:new({
+                cmd = cmd,
+                direction = opts.direction or "float",
+                hidden = true,
+                close_on_exit = false,
+                on_exit = instance.on_exit,
+            })
+            term:toggle()
+        end
+        return instance
+    end
+
+    instance.run_cmd_fn = function(cmd)
+        vim.schedule(function()
+            instance.on_start()
+            vim.fn.jobstart(cmd, {
+                on_stdout = opts.stdout or function() end,
+                on_stderr = opts.stderr or function() end,
+                on_start = opts.on_start or function() end,
+                on_exit = opts.on_exit or function() end,
+                stdout_buffered = opts.stdout_buffered or false,
+                stderr_buffered = opts.stdout_buffered or false,
+            })
+        end)
+    end
 
     return instance
 end
@@ -48,16 +72,7 @@ end
 --- @param cmd string The command to run.
 function DotnetCli:run_cmd(cmd)
     table.insert(self.history, 1, cmd)
-    vim.schedule(function()
-        self.on_start()
-        vim.fn.jobstart(cmd, {
-            on_stdout = self.stdout,
-            on_stderr = self.stderr,
-            on_exit = self.on_exit,
-            stdout_buffered = self.stdout_buffered,
-            stderr_buffered = self.stderr_buffered,
-        })
-    end)
+    self.run_cmd_fn(cmd)
 end
 
 --- Runs a .NET command in the background.
@@ -202,7 +217,14 @@ end
 --- @param target string|nil The path to the project or solution file. Lists tests from local directory if nil.
 --- @return table A table containing the list of tests.
 function DotnetCli:test_list_all(target)
-    return self:run_background_cmd("dotnet test --list-tests" .. add_target(target))
+    return self:run_background_cmd("dotnet test --list-tests " .. add_target(target))
+end
+
+--- Runs a .NET project or solution.
+--- @param target string|nil The path to the project or solution file. Runs from local
+function DotnetCli:run_project(target)
+    local cmd = "dotnet run " .. add_param("project", target)
+    self:run_cmd(cmd)
 end
 
 return DotnetCli
