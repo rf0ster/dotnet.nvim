@@ -6,44 +6,39 @@ local M = {}
 local DotnetCli = {}
 DotnetCli.__index = DotnetCli
 
+--- Singleton instance of the DotnetCli class if needed.
+local singleton_instance = nil
+
+local CMD_TYPE_CMD = "cmd"
+local CMD_TYPE_INTERACTIVE = "interactive"
+
 --- Creates a new instance of the DotnetCli class.
 --- @param opts table Options for the DotnetCli instance.
 function DotnetCli:new(opts)
     local instance = setmetatable({}, self)
 
     instance.history = {}
-    instance.on_start = opts.on_start or function() end
+    instance.on_cmd_start = opts.on_cmd_start or function() end
+    instance.on_cmd_exit = opts.on_cmd_exit or function() end
+    instance.on_cmd_stdout = opts.on_cmd_stdout or function() end
+    instance.on_cmd_stderr = opts.on_cmd_stderr or function() end
 
-    if opts.toggleterm then
-        instance.run_cmd_fn = function(cmd)
-            instance.on_start()
-            local term = require("toggleterm.terminal").Terminal:new({
-                cmd = cmd,
-                direction = opts.direction or "float",
-                hidden = true,
-                close_on_exit = false,
-                on_exit = instance.on_exit,
-            })
-            term:toggle()
-        end
-        return instance
-    end
+    instance.interactive_cmd_fn = opts.interactive_cmd_fn or function() end
+    instance.on_interactive_start = opts.on_interactive_start or function() end
+    instance.on_interactive_exit = opts.on_interactive_exit or function() end
 
-    instance.run_cmd_fn = function(cmd)
-        vim.schedule(function()
-            instance.on_start()
-            vim.fn.jobstart(cmd, {
-                on_stdout = opts.stdout or function() end,
-                on_stderr = opts.stderr or function() end,
-                on_start = opts.on_start or function() end,
-                on_exit = opts.on_exit or function() end,
-                stdout_buffered = opts.stdout_buffered or false,
-                stderr_buffered = opts.stdout_buffered or false,
-            })
-        end)
-    end
+    instance.on_background_start = opts.on_background_start or function() end
+    instance.on_background_exit = opts.on_background_exit or function() end
 
     return instance
+end
+
+--- Creates a singleton instance of the DotnetCli class.
+--- Good for configuring a single cli class once and never
+--- having to create a new instance.
+function DotnetCli:singleton(opts)
+    singleton_instance = singleton_instance or self:new(opts)
+    return singleton_instance
 end
 
 local function add_flag(flag, value)
@@ -71,8 +66,26 @@ end
 --- Runs a command using the .NET CLI.
 --- @param cmd string The command to run.
 function DotnetCli:run_cmd(cmd)
-    table.insert(self.history, 1, cmd)
-    self.run_cmd_fn(cmd)
+    table.insert(self.history, 1, { cmd = cmd, cmd_type = CMD_TYPE_CMD })
+    vim.schedule(function()
+        self.on_cmd_start(cmd)
+        vim.fn.jobstart(cmd, {
+            on_stdout = self.on_cmd_stdout,
+            on_stderr = self.on_cmd_stderr,
+            on_exit = self.on_cmd_exit,
+        })
+    end)
+end
+
+--- Runs a command using the .NET CLI in an interactive terminal.
+--- @param cmd string The command to run.
+function DotnetCli:run_interactive_cmd(cmd)
+    table.insert(self.history, 1, { cmd = cmd, cmd_type = CMD_TYPE_INTERACTIVE })
+    if self.run_interactive_cmd_fn then
+        self.on_interactive_start()
+        self.interactive_cmd_fn(cmd)
+        self.on_interactive_exit()
+    end
 end
 
 --- Runs a .NET command in the background.
@@ -80,7 +93,10 @@ end
 --- @param cmd string The command to run.
 --- @return table The result of the command execution.
 function DotnetCli:run_background_cmd(cmd)
-    return vim.fn.systemlist(cmd)
+    self.on_background_start()
+    local res = vim.fn.systemlist(cmd)
+    self.on_background_exit()
+    return res
 end
 
 --- Returns the history of commands run by the DotnetCli instance.
@@ -96,16 +112,18 @@ function DotnetCli:run_last_cmd()
     end
 
     local last_cmd = self.history[1]
-    self:run_cmd(last_cmd)
+    if last_cmd.cmd_type == CMD_TYPE_CMD then
+        self:run_cmd(last_cmd.cmd)
+    elseif last_cmd.cmd_type == CMD_TYPE_INTERACTIVE then
+        self:run_interactive_cmd(last_cmd.cmd)
+    end
 end
-
 
 --- Builds a .NET project or solution.
 --- @param target string|nil The path to the project or solution file. Builds from local directory if nil.
 --- @param configuration string|nil The build configuration (e.g., "Debug", "Release"). Defaults to "Debug" if nil
 function DotnetCli:build(target, configuration)
-    local cmd = "dotnet build" .. add_target(target) .. add_flag("-c", configuration)
-    self:run_cmd(cmd)
+    self:run_cmd("dotnet build" .. add_target(target) .. add_flag("-c", configuration))
 end
 
 --- Restores a .NET project or solution.
@@ -223,8 +241,7 @@ end
 --- Runs a .NET project or solution.
 --- @param target string|nil The path to the project or solution file. Runs from local
 function DotnetCli:run_project(target)
-    local cmd = "dotnet run " .. add_param("project", target)
-    self:run_cmd(cmd)
+    self:run_interactive_cmd("dotnet run " .. add_param("project", target))
 end
 
 return DotnetCli

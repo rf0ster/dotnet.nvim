@@ -3,10 +3,10 @@
 
 local M = {}
 
-local dotnet_cli = require("dotnet.cli")
-local dotnet_manager = require("dotnet.manager")
 local dotnet_nuget_project = require("dotnet.nuget.project")
+local dotnet_manager = require("dotnet.manager")
 local dotnet_confirm = require "dotnet.confirm"
+local DotnetCli = require("dotnet.cli.cli")
 
 local finders = require "telescope.finders"
 local pickers = require "telescope.pickers"
@@ -21,12 +21,14 @@ local function pad(str, length)
     return str .. string.rep(" ", length - #str)
 end
 
-
 function M.open()
     local sln_info = dotnet_manager.load_solution()
     if not sln_info then
         return
     end
+
+    local win = require "dotnet.cli.cli_output".singleton_window()
+    local cli = DotnetCli:singleton(win)
 
     local display_rel = true
 
@@ -135,21 +137,20 @@ function M.open()
                 if not project then
                     return
                 end
-                dotnet_cli.clean(project.path_abs)
+                cli:clean(project.path_abs)
             end)
             map("n", "r", function()
                 local project = actions_state.get_selected_entry().value
                 if not project then
                     return
                 end
-                dotnet_cli.restore(project.path_abs)
+                cli:restore(project.path_abs)
             end)
             map("n", "p", function()
                 local project = actions_state.get_selected_entry().value
                 if not project then
                     return
                 end
-                local cli = require("dotnet.cli.cli"):new({ toggleterm = true })
                 cli:run_project(project.path_abs)
             end)
             map("n", "d", function()
@@ -162,7 +163,7 @@ function M.open()
                     prompt_title = "Delete Project",
                     prompt = {"Delete " .. project.path_rel ..  " from " .. sln_info.sln_name .. "?"},
                     on_confirm = function()
-                        dotnet_cli.sln_remove(sln_info.sln_file, project.path_abs)
+                        cli:sln_remove(sln_info.sln_path_abs, project.path_abs)
                         dotnet_manager.load_solution()
                     end
                 })

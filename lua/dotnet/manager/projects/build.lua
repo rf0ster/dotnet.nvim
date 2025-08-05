@@ -2,7 +2,7 @@
 -- user through build configuration steps before running a build command.
 local M = {}
 
-local dotnet_cli = require "dotnet.cli"
+local DotnetCli = require "dotnet.cli.cli"
 
 local pickers = require "telescope.pickers"
 local finders = require "telescope.finders"
@@ -15,10 +15,13 @@ function M.open(project)
         return
     end
 
+    local cli_win = require "dotnet.cli.cli_output".singleton_window()
+    local cli = DotnetCli:singleton(cli_win)
+
     -- Create Telescope picker for build configuration options
     local build_options = {
-        { name = "Debug",   action = function() dotnet_cli.build(project.path_abs, "Debug") end },
-        { name = "Release", action = function() dotnet_cli.build(project.path_abs, "Release") end },
+        { name = "Debug",   action = function() cli:build(project.path_abs, "Debug") end },
+        { name = "Release", action = function() cli:build(project.path_abs, "Release") end },
     }
 
     local finder = finders.new_table {
@@ -50,7 +53,6 @@ function M.open(project)
             return true
         end,
     }):find()
-
 end
 
 return M
