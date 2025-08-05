@@ -4,9 +4,12 @@
 
 local M = {}
 
-local dotnet_cli = require("dotnet.cli")
-local dotnet_confirm = require("dotnet.confirm")
 local dotnet_manager_solution_build = require("dotnet.manager.solution.build")
+local dotnet_confirm = require("dotnet.confirm")
+local DotnetCli = require("dotnet.cli.cli")
+
+local cli_win = require "dotnet.cli.cli_output".singleton_window()
+local cli = DotnetCli:singleton(cli_win)
 
 function M.create()
     dotnet_confirm.open({
@@ -19,7 +22,7 @@ function M.create()
                 return
             end
 
-            dotnet_cli.new_solution(sln_name)
+            cli:new_solution(sln_name)
         end,
     })
 end
@@ -30,6 +33,7 @@ function M.open()
         return
     end
 
+
     -- Gets the project path and file name from the user in one prompt.
     -- Returns both the path and file name as two separate values.
     local function get_proj_name()
@@ -39,14 +43,14 @@ function M.open()
 
     local commands = {
         { name = "Build",   on_execute = function() dotnet_manager_solution_build.open(sln) end },
-        { name = "Clean",   on_execute = function() dotnet_cli.clean(sln.sln_path_abs) end },
-        { name = "Restore", on_execute = function() dotnet_cli.restore(sln.sln_path_abs) end },
-        { name = "Test",    on_execute = function() dotnet_cli.mstest(sln.sln_path_abs) end },
+        { name = "Clean",   on_execute = function() cli:clean(sln.sln_path_abs) end },
+        { name = "Restore", on_execute = function() cli:restore(sln.sln_path_abs) end },
+        { name = "Test",    on_execute = function() cli:mstest(sln.sln_path_abs) end },
         {
             name = "Add project",
             on_execute = function()
                 local project_name, _ = get_proj_name()
-                dotnet_cli.sln_add(sln.sln_path_abs, project_name)
+                cli:sln_add(sln.sln_path_abs, project_name)
             end
         },
         {
@@ -54,16 +58,16 @@ function M.open()
             on_execute =
             function()
                 local project_name, _ = get_proj_name()
-                dotnet_cli.new_console(project_name)
-                dotnet_cli.sln_add(sln.sln_path_abs, project_name)
+                cli:new_console(project_name)
+                cli:sln_add(sln.sln_path_abs, project_name)
             end
         },
         {
             name = "New classlib",
             on_execute = function()
                 local project_name = get_proj_name()
-                dotnet_cli.new_classlib(project_name)
-                dotnet_cli.sln_add(sln.sln_path_abs, project_name)
+                cli:new_classlib(project_name)
+                cli:sln_add(sln.sln_path_abs, project_name)
             end
         },
     }

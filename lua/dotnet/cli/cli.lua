@@ -244,4 +244,12 @@ function DotnetCli:run_project(target)
     self:run_interactive_cmd("dotnet run " .. add_param("project", target))
 end
 
+--- Runs tests for a .NET project or solution using MSTest.
+--- @param target string|nil The path to the project or solution file. Runs tests from local directory if nil.
+--- @param filter string|nil The test filter expression. If nil, no filter is applied.
+--- @param logger string|nil The logger to use for test results.
+function DotnetCli:mstest(target, filter, logger)
+    return self:run_cmd("dotnet test" .. add_target(target) .. add_param("filter", filter) .. add_param("logger", logger))
+end
+
 return DotnetCli
