@@ -101,4 +101,26 @@ function M.singleton_window(opts)
     }
 end
 
+function M.add_toggleterm(opts)
+    opts = opts or {}
+
+    opts.on_interactive_start = function() end
+    opts.on_interactive_exit = function() end
+
+    opts.interactive_cmd = function(cmd)
+        local term = require("toggleterm.terminal").Terminal:new({
+            cmd = cmd,
+            direction = "float",
+            float_opts = {
+                border = "rounded",
+                width = opts.width or math.floor(vim.o.columns * 0.8),
+                height = opts.height or math.floor(vim.o.lines * 0.8),
+            },
+        })
+        term:toggle()
+    end
+
+    return opts
+end
+
 return M

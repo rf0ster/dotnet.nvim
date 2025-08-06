@@ -1,5 +1,3 @@
-local M = {}
-
 --- Dotnet CLI class for managing .NET commands and operations.
 --- This class provides methods to run .NET CLI commands, manage project dependencies,
 --- and handle command history.
@@ -23,7 +21,7 @@ function DotnetCli:new(opts)
     instance.on_cmd_stdout = opts.on_cmd_stdout or function() end
     instance.on_cmd_stderr = opts.on_cmd_stderr or function() end
 
-    instance.interactive_cmd_fn = opts.interactive_cmd_fn or function() end
+    instance.interactive_cmd = opts.interactive_cmd or function() end
     instance.on_interactive_start = opts.on_interactive_start or function() end
     instance.on_interactive_exit = opts.on_interactive_exit or function() end
 
@@ -81,9 +79,10 @@ end
 --- @param cmd string The command to run.
 function DotnetCli:run_interactive_cmd(cmd)
     table.insert(self.history, 1, { cmd = cmd, cmd_type = CMD_TYPE_INTERACTIVE })
-    if self.run_interactive_cmd_fn then
+    if self.interactive_cmd then
         self.on_interactive_start()
-        self.interactive_cmd_fn(cmd)
+        print("Calling interactive command: " .. cmd)
+        self.interactive_cmd(cmd)
         self.on_interactive_exit()
     end
 end
