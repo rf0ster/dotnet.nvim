@@ -1,0 +1,146 @@
+local M = {}
+
+local Job = require "plenary.job"
+
+--- Async function to fetch data from a URL using curl.
+--- @param url string The URL to fetch data from.
+--- @param callback function The callback function to handle the result.
+--- The callback will receive two arguments: data (table) and error (string).
+--- If the request is successful, data will be a table and error will be nil.
+--- If the request fails, data will be nil and error will contain the error message.
+--- @return nil
+--- @usage
+--- local function handle_result(data, err)
+---     if err then
+---         print("Error fetching data: " .. err)
+---     else
+---         print("Data fetched successfully: " .. vim.inspect(data))
+---     end
+--- end
+--- get("https://api.nuget.org/v3/index.json", handle_result)
+local function get(url, callback)
+    Job:new({
+        command = "curl",
+        args = { "-s", url },
+        on_exit = function(job, code)
+            local result = job:result()
+            vim.schedule(function()
+                if code == 0 then
+                    local data = vim.fn.json_decode(result)
+                    callback(data)
+                else
+                    callback(nil, "Failed to fetch data from " .. url)
+                end
+            end)
+        end,
+    }):start()
+end
+
+--- Fetches the NuGet service index asynchronously.
+--- @param callback function The callback function to handle the result.
+--- The callback will receive two arguments: data (table) and error (string).
+--- If the request is successful, data will be a table and error will be nil.
+--- If the request fails, data will be nil and error will contain the error message.
+--- @return nil
+--- @usage
+--- local function handle_index(data, err)
+---     if err then
+---         print("Error fetching service index: " .. err)
+---     else
+---         print("Service Index: " .. vim.inspect(data))
+---     end
+--- end
+--- get_serivce_index(handle_index)
+local function get_serivce_index(callback)
+    get("https://api.nuget.org/v3/index.json", callback)
+end
+
+--- Gets the service resource URL for a specific type.
+--- @param type string The type of the service resource to fetch.
+--- @param callback function The callback function to handle the result.
+--- The callback will receive two arguments: url (string) and error (string).
+--- If the request is successful, url will be a string and error will be nil.
+--- If the request fails, url will be nil and error will contain the error message.
+--- @return nil
+--- @usage
+--- local function handle_resource(url, err)
+---     if err then
+---         print("Error fetching service resource: " .. err)
+---     else
+---         print("Service Resource URL: " .. url)
+---     end
+--- end
+--- get_service_resource("SearchQueryService", handle_resource)
+local function get_service_resource(type, callback)
+    get_serivce_index(function(data, err)
+        if err then
+            callback(nil, err)
+            return
+        end
+
+        if not data or not data.resources then
+            callback(nil, "Invalid service index format")
+            return
+        end
+
+        for _, resource in ipairs(data.resources) do
+            if resource["@type"] == type then
+                callback(resource["@id"])
+                return
+            end
+        end
+
+        callback(nil, "Resource type not found: " .. type)
+    end)
+end
+
+
+function M.get_registration_base(package_id, version, callback)
+    if not package_id or package_id == "" then
+        return nil
+    end
+
+    get_service_resource("RegistrationBaseUrl", function(registration_url, registration_err)
+        if registration_err then
+            callback(nil, registration_err)
+            return
+        end
+
+        if not registration_url then
+            callback(nil, "RegistrationBaseUrl not found")
+            return
+        end
+
+        local url = registration_url .. package_id:lower() .. "/" .. (version or "index") .. ".json"
+        get(url, function(data, err)
+            if err then
+                callback(nil, err)
+                return
+            end
+            if not data then
+                callback(nil, "Failed to fetch registration base for " .. package_id)
+                return
+            end
+
+            local pkg_info = data.catalogEntry
+            if type(pkg_info) ~= "string" then
+                callback(pkg_info)
+            end
+
+            -- If the catalogEntry is a URL, fetch it
+            get(pkg_info, function(r, e)
+                if e then
+                    callback(nil, e)
+                    return
+                end
+                if not r then
+                    callback(nil, "Failed to fetch catalog entry for " .. package_id)
+                    return
+                end
+                callback(r)
+            end)
+        end)
+    end)
+end
+
+return M

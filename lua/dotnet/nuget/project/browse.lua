@@ -14,7 +14,6 @@
 
 local M  = {}
 
-local api_client = require "dotnet.nuget.api_client"
 local config = require "dotnet.nuget.config"
 local utils = require "dotnet.utils"
 local nuget_picker = require "dotnet.nuget.nuget_picker"
