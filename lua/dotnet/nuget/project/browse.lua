@@ -63,7 +63,6 @@ function M.open(proj_file)
         col = picker_c,
         width = picker_w,
         height = picker_h,
-        debounce = 300,
         default_search_term = state.search_term,
         map_to_results = function(val)
             state.search_term = val

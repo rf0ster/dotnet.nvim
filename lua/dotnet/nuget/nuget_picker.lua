@@ -9,7 +9,7 @@ function M.create(opts)
     local map_to_results = opts.map_to_results or function(_) return {} end
     local on_selected = opts.on_selected or function(_) end
 
-    local debounce = opts.debounce or 0
+    local debounce = opts.debounce or 300
     local default_search_term = opts.default_search_term or ""
 
     --- Create the search prompt. This buffer is used
@@ -116,18 +116,20 @@ function M.create(opts)
         local display_results = {}
         stored_values = {}
 
-        for _, result in ipairs(map_to_results(search_term)) do
-            table.insert(stored_values, result)
-            table.insert(display_results, " " .. result.display)
-        end
+        vim.schedule(function()
+            for _, result in ipairs(map_to_results(search_term)) do
+                table.insert(stored_values, result)
+                table.insert(display_results, " " .. result.display)
+            end
 
-        vim.api.nvim_buf_set_option(results_bufnr, "modifiable", true)
-        vim.api.nvim_buf_set_lines(results_bufnr, 0, -1, false, {})
-        vim.api.nvim_buf_set_lines(results_bufnr, 0, 0, false, display_results)
-        vim.api.nvim_buf_set_option(results_bufnr, "modifiable", false)
-        vim.api.nvim_win_set_cursor(results_win, { 1, 0 })
+            vim.api.nvim_buf_set_option(results_bufnr, "modifiable", true)
+            vim.api.nvim_buf_set_lines(results_bufnr, 0, -1, false, {})
+            vim.api.nvim_buf_set_lines(results_bufnr, 0, 0, false, display_results)
+            vim.api.nvim_buf_set_option(results_bufnr, "modifiable", false)
+            vim.api.nvim_win_set_cursor(results_win, { 1, 0 })
 
-        move_results_cursor(0) -- Trick to make the first result selected
+            move_results_cursor(0) -- Trick to make the first result selected
+        end)
     end
 
     -- Setup an optional debounce timer for the search input
