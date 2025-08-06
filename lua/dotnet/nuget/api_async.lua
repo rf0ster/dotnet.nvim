@@ -173,7 +173,6 @@ function M.get_pkg_registration(package_id, version, callback)
 
     local cache_key = package_id:lower() .. "@" .. (version or "index")
     if M.use_cache and M.cache.pkg_registrations[cache_key] then
-        print("Using cached registration for " .. cache_key)
         callback(M.cache.pkg_registrations[cache_key])
         return
     end
@@ -337,27 +336,6 @@ function M.get_search_query(query, take, prerelease, callback)
 
             sceduled_callback(data.data or {})
         end)
-    end)
-end
-
-function M.test()
-    -- Time this function to see how long it takes to fetch the service index
-    local start_time = vim.loop.hrtime()
-    M.get_pkg_registration("Newtonsoft.Json", "13.0.1", function(data, err)
-        if err then
-            print("Error fetching package registration: " .. err)
-        else
-            print("ID: " .. data.id)
-            print("Description: " .. data.description)
-            print("Authors: " .. (data.authors or "Unknown"))
-            print("Icon URL: " .. (data.iconUrl or "No icon"))
-            print("Project URL: " .. (data.projectUrl or "No project URL"))
-            print("License URL: " .. (data.licenseUrl or "No license URL"))
-        end
-
-        local end_time = vim.loop.hrtime()
-        local elapsed_time = (end_time - start_time) / 1e6 -- Convert to milliseconds
-        print("Time taken to fetch package registration: " .. elapsed_time .. " ms")
     end)
 end
 

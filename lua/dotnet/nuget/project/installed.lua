@@ -19,8 +19,8 @@ local config = require "dotnet.nuget.config"
 local utils = require "dotnet.utils"
 local nuget_picker = require "dotnet.nuget.nuget_picker"
 local fuzzy = require "dotnet.nuget.fuzzy"
-local api_client_cache = require "dotnet.nuget.api_client_cache"
 local window = require "dotnet.nuget.window"
+local nuget_api_async = require "dotnet.nuget.api_async"
 
 function M.open(proj_file)
     local d = window.get_dimensions()
@@ -100,33 +100,38 @@ function M.open(proj_file)
             if not M.view_bufnr then
                 return
             end
-            if not val then
-                vim.api.nvim_buf_set_option(M.view_bufnr, "modifiable", true)
-                vim.api.nvim_buf_set_lines(M.view_bufnr, 0, -1, false, {})
-                vim.api.nvim_buf_set_option(M.view_bufnr, "modifiable", false)
-                return
-            end
-
-            local pkg = api_client_cache.get_pkg_info(val.value.id, val.value.version)
-            if not pkg then
-                return
-            end
-
             vim.api.nvim_buf_set_option(M.view_bufnr, "modifiable", true)
             vim.api.nvim_buf_set_lines(M.view_bufnr, 0, -1, false, {})
-            vim.api.nvim_buf_set_lines(M.view_bufnr, 0, 0, false, {
-                " ID: " .. pkg.id,
-                " Version: " .. pkg.version,
-                " Authors: " .. (pkg.authors or "Unknown"),
-                " Description: ",
-            })
-
-            local w = vim.api.nvim_win_get_width(M.view_win)
-            local s = utils.split_smart(pkg.description, w, 3, 1)
-
-            local last_line = vim.api.nvim_buf_line_count(M.view_bufnr)
-            vim.api.nvim_buf_set_lines(M.view_bufnr, last_line - 1, -1, false, s)
             vim.api.nvim_buf_set_option(M.view_bufnr, "modifiable", false)
+
+            if not val then
+                return
+            end
+
+            nuget_api_async.get_pkg_registration(val.value.id, val.value.version, function(pkg)
+                vim.api.nvim_buf_set_option(M.view_bufnr, "modifiable", true)
+                vim.api.nvim_buf_set_lines(M.view_bufnr, 0, -1, false, {})
+
+                if not pkg or not pkg.id or not pkg.version then
+                    vim.api.nvim_buf_set_lines(M.view_bufnr, 0, -1, false, {
+                        "No package information available."
+                    })
+                else
+                    vim.api.nvim_buf_set_lines(M.view_bufnr, 0, 0, false, {
+                        " ID: " .. pkg.id,
+                        " Version: " .. pkg.version,
+                        " Authors: " .. (pkg.authors or "Unknown"),
+                        " Description: ",
+                    })
+                    local w = vim.api.nvim_win_get_width(M.view_win)
+                    local s = utils.split_smart(pkg.description, w, 3, 1)
+
+                    local last_line = vim.api.nvim_buf_line_count(M.view_bufnr)
+                    vim.api.nvim_buf_set_lines(M.view_bufnr, last_line - 1, -1, false, s)
+                end
+
+                vim.api.nvim_buf_set_option(M.view_bufnr, "modifiable", false)
+            end)
         end,
         keymaps = {
             {

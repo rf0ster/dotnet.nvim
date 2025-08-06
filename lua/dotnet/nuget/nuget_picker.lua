@@ -6,10 +6,11 @@ function M.create(opts)
     local r = opts.row
     local c = opts.col
 
-    local map_to_results = opts.map_to_results or function(_) return {} end
     local on_selected = opts.on_selected or function(_) end
+    local map_to_results = opts.map_to_results or function(_) return {} end
+    local map_to_results_async = opts.map_to_results_async
 
-    local debounce = opts.debounce or 300
+    local debounce = opts.debounce or 100
     local default_search_term = opts.default_search_term or ""
 
     --- Create the search prompt. This buffer is used
@@ -106,18 +107,35 @@ function M.create(opts)
         })
     end
 
-    --- Function called every time the search term changes.
-    --- Reads the search term from the search buffer,
-    --- maps it to results using the provided `map_to_results`
-    --- function, and updates the results buffer with the new results.
+
     local wrapped_on_change = function()
         local search_term = vim.api.nvim_buf_get_lines(search_bufnr, 0, -1, false)[1] or ""
 
         local display_results = {}
         stored_values = {}
 
-        vim.schedule(function()
-            for _, result in ipairs(map_to_results(search_term)) do
+        for _, result in ipairs(map_to_results(search_term)) do
+            table.insert(stored_values, result)
+            table.insert(display_results, " " .. result.display)
+        end
+
+        vim.api.nvim_buf_set_option(results_bufnr, "modifiable", true)
+        vim.api.nvim_buf_set_lines(results_bufnr, 0, -1, false, {})
+        vim.api.nvim_buf_set_lines(results_bufnr, 0, 0, false, display_results)
+        vim.api.nvim_buf_set_option(results_bufnr, "modifiable", false)
+        vim.api.nvim_win_set_cursor(results_win, { 1, 0 })
+
+        move_results_cursor(0) -- Trick to make the first result selected
+    end
+
+    local wrapped_on_change_async = function()
+        local search_term = vim.api.nvim_buf_get_lines(search_bufnr, 0, -1, false)[1] or ""
+
+        map_to_results_async(search_term, function(results)
+            local display_results = {}
+            stored_values = {}
+
+            for _, result in ipairs(results) do
                 table.insert(stored_values, result)
                 table.insert(display_results, " " .. result.display)
             end
@@ -144,7 +162,11 @@ function M.create(opts)
                     vim.fn.timer_stop(debounce_timer)
                 end
                 debounce_timer = vim.fn.timer_start(debounce, function()
-                    wrapped_on_change()
+                    if map_to_results_async then
+                        wrapped_on_change_async()
+                    else
+                        wrapped_on_change()
+                    end
                     debounce_timer = nil
                 end)
             end
@@ -152,7 +174,13 @@ function M.create(opts)
     else
         vim.api.nvim_create_autocmd("TextChangedI", {
             buffer = search_bufnr,
-            callback = wrapped_on_change
+            callback = function()
+                if map_to_results_async then
+                    wrapped_on_change_async()
+                else
+                    wrapped_on_change()
+                end
+            end
         })
     end
 
@@ -171,7 +199,11 @@ function M.create(opts)
 
     -- Schedule a task to ensure the results window is updated
     vim.schedule(function()
-        wrapped_on_change()
+        if map_to_results_async then
+            wrapped_on_change_async()
+        else
+            wrapped_on_change()
+        end
     end)
 
     return M.get_state()
@@ -185,23 +217,6 @@ function M.get_state()
         results_bufnr = M.results_bufnr,
         results_win = M.results_win,
     }
-end
-
-function M.test()
-    M.create({
-        width = 80,
-        height = 20,
-        row = 5,
-        col = 5,
-        debounce = 300,
-        map_to_results = function(term)
-            return {
-                { display =  "Result 1 for: " .. term  },
-                { display =  "Result 2 for: " .. term  },
-                { display =  "Result 3 for: " .. term  },
-            }
-        end
-    })
 end
 
 return M

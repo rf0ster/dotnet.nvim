@@ -18,6 +18,7 @@ local config = require "dotnet.nuget.config"
 local utils = require "dotnet.utils"
 local nuget_picker = require "dotnet.nuget.nuget_picker"
 local window = require "dotnet.nuget.window"
+local nuget_api_async = require "dotnet.nuget.api_async"
 
 local state = {
     search_term = "",
@@ -63,30 +64,37 @@ function M.open(proj_file)
         width = picker_w,
         height = picker_h,
         default_search_term = state.search_term,
-        map_to_results = function(val)
-            state.search_term = val
-            if not val or val == "" then
-                return {}
+        map_to_results_async = function(search_term, callback)
+            state.search_term = search_term
+            if not search_term or search_term == "" then
+                callback({})
+                return
             end
 
-            local query = string.match(val, "%S+")
+            local query = string.match(search_term, "%S+")
             if not query then
-                return {}
+                callback({})
+                return
             end
 
-            -- Fetch packages from the API api_client
-            local pkgs = api_client.get_search_query(query, picker_h * 2, true) or {}
 
-            local results = {}
-            for _, pkg in ipairs(pkgs) do
-                if pkg and pkg.id and pkg.version then
-                    table.insert(results, {
-                        display = pkg.id .. "@" .. pkg.version,
-                        value = pkg,
-                    })
+            nuget_api_async.get_search_query(query, picker_h * 2, true, function(pkgs)
+                if not pkgs or #pkgs == 0 then
+                    callback({})
+                    return
                 end
-            end
-            return results
+
+                local results = {}
+                for _, pkg in ipairs(pkgs) do
+                    if pkg and pkg.id and pkg.version then
+                        table.insert(results, {
+                            display = pkg.id .. "@" .. pkg.version,
+                            value = pkg,
+                        })
+                    end
+                end
+                callback(results)
+            end)
         end,
         on_selected = function(val)
             if not M.view_bufnr then
