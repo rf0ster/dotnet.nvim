@@ -47,10 +47,10 @@ function M.smart_output_opts(bufnr, win)
         end
     end
 
-    opts.stdout = on_output
-    opts.stderr = on_output
+    opts.on_cmd_stdout = on_output
+    opts.on_cmd_stderr = on_output
 
-    opts.on_start = function()
+    opts.on_cmd_start = function()
         if not vim.api.nvim_buf_is_valid(bufnr) then
             return
         end
@@ -60,7 +60,7 @@ function M.smart_output_opts(bufnr, win)
         vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
     end
 
-    opts.on_exit = function()
+    opts.on_cmd_exit = function()
         vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
     end
 
