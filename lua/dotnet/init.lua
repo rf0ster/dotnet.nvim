@@ -30,7 +30,7 @@ M.setup = function(config)
         elseif opts.args == "history" then
             require "dotnet.cli.history".open()
         elseif opts.args == "last_cmd" then
-            require "dotnet.cli".run_last_cmd()
+            require "dotnet.manager.cli".get_cli():run_last_cmd()
         end
     end, { nargs = 1 })
 end

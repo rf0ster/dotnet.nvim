@@ -127,10 +127,7 @@ function M.open(proj_file)
             {
                 key = "<CR>",
                 callback = function(val)
-                    local DotnetCli = require "dotnet.cli.cli"
-                    local options = require "dotnet.cli.cli_opts"
-
-                    local cli = DotnetCli:new(options.smart_output_opts(output_bufnr, output_win))
+                    local cli = require "dotnet.nuget.cli".new(output_bufnr, output_win)
                     cli:add_package(proj_file, val.value.id, val.value.version)
                 end
             }

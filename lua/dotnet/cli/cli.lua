@@ -61,10 +61,31 @@ local function add_param(name, value)
     end
 end
 
+
+--- Inserts a command into the history if it is not already present.
+function DotnetCli:insert_history(cmd, cmd_type)
+    if not cmd or cmd == "" then
+        return
+    end
+
+    -- If the command is already in history, do not insert it again
+    -- but move it to the front.
+    for i, entry in ipairs(self.history) do
+        if entry.cmd == cmd and entry.cmd_type == cmd_type then
+            table.remove(self.history, i)
+            table.insert(self.history, 1, entry)
+            return
+        end
+    end
+
+    -- Insert the command into history
+    table.insert(self.history, 1, { cmd = cmd, cmd_type = cmd_type })
+end
+
 --- Runs a command using the .NET CLI.
 --- @param cmd string The command to run.
 function DotnetCli:run_cmd(cmd)
-    table.insert(self.history, 1, { cmd = cmd, cmd_type = CMD_TYPE_CMD })
+    self:insert_history(cmd, CMD_TYPE_CMD)
     vim.schedule(function()
         self.on_cmd_start(cmd)
         vim.fn.jobstart(cmd, {
@@ -78,7 +99,7 @@ end
 --- Runs a command using the .NET CLI in an interactive terminal.
 --- @param cmd string The command to run.
 function DotnetCli:run_interactive_cmd(cmd)
-    table.insert(self.history, 1, { cmd = cmd, cmd_type = CMD_TYPE_INTERACTIVE })
+    self:insert_history(cmd, CMD_TYPE_INTERACTIVE)
     if self.interactive_cmd then
         self.on_interactive_start()
         print("Calling interactive command: " .. cmd)

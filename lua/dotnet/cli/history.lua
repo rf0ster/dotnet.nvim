@@ -4,7 +4,8 @@
 local M = {}
 
 function M.open()
-    local dotnet_cli = require("dotnet.cli")
+    local cli = require "dotnet.manager.cli".get_cli()
+
     local finders = require "telescope.finders"
     local pickers = require "telescope.pickers"
     local sorters = require "telescope.sorters"
@@ -12,7 +13,7 @@ function M.open()
     local actions_state = require "telescope.actions.state"
 
     -- Load the historical commands from the .NET CLI module.
-    local commands = dotnet_cli.get_history()
+    local commands = cli:get_history()
 
     pickers.new({}, {
         prompt_title = "Historical Commands",
@@ -29,8 +30,8 @@ function M.open()
             entry_maker = function(entry)
                 return {
                     value = entry,
-                    display = entry,
-                    ordinal = entry,
+                    display = entry.cmd,
+                    ordinal = entry.cmd,
                 }
             end,
         },
@@ -38,7 +39,7 @@ function M.open()
         attach_mappings = function(_, map)
             map("n", "<CR>", function(prompt_bufnr)
                 local selection = actions_state.get_selected_entry()
-                dotnet_cli.run_cmd(selection.value)
+                cli:run_cmd(selection.value.cmd)
                 pcall(actions.close, prompt_bufnr)
             end)
             return true

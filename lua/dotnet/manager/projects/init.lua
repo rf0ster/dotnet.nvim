@@ -6,8 +6,7 @@ local M = {}
 local dotnet_nuget_project = require "dotnet.nuget.project"
 local dotnet_manager = require "dotnet.manager"
 local dotnet_confirm = require "dotnet.confirm"
-local cli_output = require "dotnet.cli.cli_output"
-local DotnetCli = require "dotnet.cli.cli"
+local cli = require "dotnet.manager.cli".get_cli()
 
 local finders = require "telescope.finders"
 local pickers = require "telescope.pickers"
@@ -27,11 +26,6 @@ function M.open()
     if not sln_info then
         return
     end
-
-    local opts = cli_output.singleton_window()
-    opts = cli_output.add_toggleterm(opts)
-
-    local cli = DotnetCli:singleton(opts)
 
     local display_rel = true
 

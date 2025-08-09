@@ -2,11 +2,10 @@
 -- user through build configuration steps before running a build command.
 local M = {}
 
-local dotnet_cli = require "dotnet.cli"
-
 local pickers = require "telescope.pickers"
 local finders = require "telescope.finders"
 local actions_state = require "telescope.actions.state"
+local manager_cli = require "dotnet.manager.cli"
 
 --- Given the solution, open the build manager
 --- @param solution table The solution to open the build manager for
@@ -15,10 +14,11 @@ function M.open(solution)
         return
     end
 
+    local cli = manager_cli.get_cli()
     -- Create Telescope picker for build configuration options
     local build_options = {
-        { name = "Debug",   action = function() dotnet_cli.build(solution.sln_path_abs, "Debug") end },
-        { name = "Release", action = function() dotnet_cli.build(solution.sln_path_abs, "Release") end },
+        { name = "Debug",   action = function() cli:build(solution.sln_path_abs, "Debug") end },
+        { name = "Release", action = function() cli:build(solution.sln_path_abs, "Release") end },
     }
 
     local finder = finders.new_table {
@@ -50,8 +50,6 @@ function M.open(solution)
             return true
         end,
     }):find()
-
-
 end
 
 return M

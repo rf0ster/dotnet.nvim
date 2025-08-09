@@ -125,12 +125,7 @@ function M.open(proj_file)
             {
                 key = "u",
                 callback = function(val)
-                    local DotnetCli = require "dotnet.cli.cli"
-                    local options = require "dotnet.cli.cli_opts"
-
-                    local opts = options.smart_output_opts(output_bufnr, output_win)
-                    local cli = DotnetCli:new(opts)
-
+                    local cli = require "dotnet.nuget.cli".new(output_bufnr, output_win)
                     cli:remove_package(proj_file, val.value.id)
                 end
             }

@@ -2,8 +2,8 @@
 -- user through build configuration steps before running a build command.
 local M = {}
 
-local DotnetCli = require "dotnet.cli.cli"
 
+local cli = require "dotnet.manager.cli".get_cli()
 local pickers = require "telescope.pickers"
 local finders = require "telescope.finders"
 local actions_state = require "telescope.actions.state"
@@ -14,9 +14,6 @@ function M.open(project)
     if not project then
         return
     end
-
-    local cli_win = require "dotnet.cli.cli_output".singleton_window()
-    local cli = DotnetCli:singleton(cli_win)
 
     -- Create Telescope picker for build configuration options
     local build_options = {

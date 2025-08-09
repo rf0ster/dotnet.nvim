@@ -6,13 +6,7 @@ local M = {}
 
 local dotnet_manager_solution_build = require("dotnet.manager.solution.build")
 local dotnet_confirm = require("dotnet.confirm")
-local DotnetCli = require("dotnet.cli.cli")
-
-local cli_output = require "dotnet.cli.cli_output"
-local opts = cli_output.singleton_window()
-opts = cli_output.add_toggleterm(opts)
-
-local cli = DotnetCli:singleton(opts)
+local cli = require "dotnet.manager.cli".get_cli()
 
 function M.create()
     dotnet_confirm.open({
