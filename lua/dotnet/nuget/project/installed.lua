@@ -80,9 +80,10 @@ function M.open(proj_file)
             return results
         end,
         on_selected = function(val)
-            if not M.view_bufnr then
+            if not M.view_bufnr or not vim.api.nvim_buf_is_valid(M.view_bufnr) then
                 return
             end
+
             vim.api.nvim_buf_set_option(M.view_bufnr, "modifiable", true)
             vim.api.nvim_buf_set_lines(M.view_bufnr, 0, -1, false, {})
             vim.api.nvim_buf_set_option(M.view_bufnr, "modifiable", false)
@@ -92,6 +93,10 @@ function M.open(proj_file)
             end
 
             nuget_api.get_pkg_registration_async(val.value.id, val.value.version, function(pkg)
+                if not vim.api.nvim_buf_is_valid(M.view_bufnr) then
+                    return
+                end
+
                 vim.api.nvim_buf_set_option(M.view_bufnr, "modifiable", true)
                 vim.api.nvim_buf_set_lines(M.view_bufnr, 0, -1, false, {})
 
