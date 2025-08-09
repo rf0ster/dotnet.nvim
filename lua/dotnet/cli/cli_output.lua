@@ -108,14 +108,14 @@ function M.add_toggleterm(opts)
     opts.on_interactive_exit = function() end
 
     opts.interactive_cmd = function(cmd)
+        -- create a new terminal instance with the given commands
+        -- in a new tab
         local term = require("toggleterm.terminal").Terminal:new({
             cmd = cmd,
-            direction = "float",
-            float_opts = {
-                border = "rounded",
-                width = opts.width or math.floor(vim.o.columns * 0.8),
-                height = opts.height or math.floor(vim.o.lines * 0.8),
-            },
+            direction = "horizontal",
+            border = "rounded",
+            style = "minimal",
+            close_on_exit = false,
         })
         term:toggle()
     end

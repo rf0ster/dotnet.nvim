@@ -18,7 +18,7 @@ local config = require "dotnet.nuget.config"
 local utils = require "dotnet.utils"
 local nuget_picker = require "dotnet.nuget.nuget_picker"
 local window = require "dotnet.nuget.window"
-local nuget_api_async = require "dotnet.nuget.api_async"
+local nuget_api = require "dotnet.nuget.api"
 
 local state = {
     search_term = "",
@@ -78,7 +78,7 @@ function M.open(proj_file)
             end
 
 
-            nuget_api_async.get_search_query(query, picker_h * 2, true, function(pkgs)
+            nuget_api.get_search_query_async(query, picker_h * 2, function(pkgs)
                 if not pkgs or #pkgs == 0 then
                     callback({})
                     return

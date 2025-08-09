@@ -149,12 +149,14 @@ function M.open()
                 end
                 cli:restore(project.path_abs)
             end)
-            map("n", "p", function()
+            map("n", "p", function(prompt_bufnr)
                 local project = actions_state.get_selected_entry().value
                 if not project then
                     return
                 end
-                cli:run_project(project.path_abs)
+
+                actions.close(prompt_bufnr)
+                vim.schedule(function() cli:run_project(project.path_abs) end)
             end)
             map("n", "d", function()
                 local project = actions_state.get_selected_entry().value

@@ -1,12 +1,11 @@
--- Description: Module for interacting with the NuGet API.
--- Contains bare bones api logic and does not handle decoding or error handling.
+-- Description: Synschronous api for interacting with the NuGet.
 local curl = require "plenary.curl"
 
 local M = {}
 
 --- Gets the service index for NuGet.
 --- @return table|nil
-function M.get_service_index()
+local function get_service_index()
     return curl.get("https://api.nuget.org/v3/index.json", { accept = "application/json" })
 end
 

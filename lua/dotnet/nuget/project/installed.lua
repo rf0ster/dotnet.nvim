@@ -20,7 +20,7 @@ local utils = require "dotnet.utils"
 local nuget_picker = require "dotnet.nuget.nuget_picker"
 local fuzzy = require "dotnet.nuget.fuzzy"
 local window = require "dotnet.nuget.window"
-local nuget_api_async = require "dotnet.nuget.api_async"
+local nuget_api = require "dotnet.nuget.api"
 
 function M.open(proj_file)
     local d = window.get_dimensions()
@@ -108,7 +108,7 @@ function M.open(proj_file)
                 return
             end
 
-            nuget_api_async.get_pkg_registration(val.value.id, val.value.version, function(pkg)
+            nuget_api.get_pkg_registration_async(val.value.id, val.value.version, function(pkg)
                 vim.api.nvim_buf_set_option(M.view_bufnr, "modifiable", true)
                 vim.api.nvim_buf_set_lines(M.view_bufnr, 0, -1, false, {})
 

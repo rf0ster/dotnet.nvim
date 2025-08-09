@@ -1,28 +1,7 @@
-local M = {
-    use_cache = true, -- Whether to use caching for service index and package data
-    cache = {
-        service_index = nil, -- Cache for the NuGet service index
-        service_resources = {}, -- Cache for service resources
-        pkg_registrations = {}, -- Cache for package registations
-        pkg_bases = {}, -- Cache for package base addresses
-    }
-}
+local M = {}
 
-local Job = require "plenary.job"
-
-function M.setup(opts)
-    if opts.use_cache ~= nil then
-        M.use_cache = opts.use_cache
-    end
-end
-
-function M.reset_cache()
-    M.cache.service_index = nil
-    M.cache.service_resources = {}
-    M.cache.pkg_registrations = {}
-    M.cache.pkg_bases = {}
-end
-
+local cache = require "dotnet.nuget.api.cache"
+local endpoints = require "dotnet.nuget.api.endpoints"
 
 --- Async function to fetch data from a URL using curl.
 --- @param url string The URL to fetch data from.
@@ -41,7 +20,7 @@ end
 --- end
 --- get("https://api.nuget.org/v3/index.json", handle_result)
 local function get(url, callback)
-    Job:new({
+    require "plenary.job":new({
         command = "curl",
         args = { "-s", url },
         on_exit = function(job, code)
@@ -74,12 +53,13 @@ end
 --- end
 --- get_serivce_index(handle_index)
 local function get_serivce_index(callback)
-    if M.use_cache and M.cache.service_index then
-        callback(M.cache.service_index)
+    local cached = cache.get_service_index()
+    if cached then
+        callback(cached)
         return
     end
 
-    get("https://api.nuget.org/v3/index.json", function(data, err)
+    get(endpoints.uris.service_index, function(data, err)
         if err then
             callback(nil, err)
             return
@@ -90,7 +70,7 @@ local function get_serivce_index(callback)
             return
         end
 
-        M.cache.service_index = data
+        cache.set_service_index(data)
         callback(data)
     end)
 end
@@ -112,8 +92,9 @@ end
 --- end
 --- get_service_resource("SearchQueryService", handle_resource)
 local function get_service_resource(type, callback)
-    if M.use_cache and M.cache.service_resources[type] then
-        callback(M.cache.service_resources[type])
+    local cached = cache.get_service_resource(type)
+    if cached then
+        callback(cached)
         return
     end
 
@@ -130,7 +111,7 @@ local function get_service_resource(type, callback)
 
         for _, resource in ipairs(data.resources) do
             if resource["@type"] == type then
-                M.cache.service_resources[type] = resource["@id"]
+                cache.set_service_resource(type, resource["@id"])
                 callback(resource["@id"])
                 return
             end
@@ -171,14 +152,8 @@ function M.get_pkg_registration(package_id, version, callback)
         return nil
     end
 
-    local cache_key = package_id:lower() .. "@" .. (version or "index")
-    if M.use_cache and M.cache.pkg_registrations[cache_key] then
-        callback(M.cache.pkg_registrations[cache_key])
-        return
-    end
-
     local sceduled_callback = vim.schedule_wrap(callback)
-    get_service_resource("RegistrationsBaseUrl", function(registration_url, registration_err)
+    get_service_resource(endpoints.resources.reg_base_url, function(registration_url, registration_err)
         if registration_err then
             sceduled_callback(nil, registration_err)
             return
@@ -215,7 +190,7 @@ function M.get_pkg_registration(package_id, version, callback)
                     sceduled_callback(nil, "Failed to fetch catalog entry for " .. package_id)
                     return
                 end
-                M.cache.pkg_registrations[cache_key] = r
+                cache.set_pkg_registration(package_id, version, r)
                 sceduled_callback(r)
             end)
         end)
@@ -246,14 +221,8 @@ function M.get_pkg_base(package_id, callback)
         return nil
     end
 
-    local cache_key = package_id:lower()
-    if M.use_cache and M.cache.pkg_bases[cache_key] then
-        callback(M.cache.pkg_bases[cache_key])
-        return
-    end
-
     local sceduled_callback = vim.schedule_wrap(callback)
-    get_service_resource("PackageBaseAddress/3.0.0", function(base_url, base_err)
+    get_service_resource(endpoints.resources.pkg_base_addr, function(base_url, base_err)
         if base_err then
             sceduled_callback(nil, base_err)
             return
@@ -275,7 +244,7 @@ function M.get_pkg_base(package_id, callback)
                 return
             end
 
-            M.cache.pkg_bases[cache_key] = data
+            cache.set_pkg_base(package_id, data)
             sceduled_callback(data)
         end)
     end)
@@ -308,7 +277,7 @@ function M.get_search_query(query, take, prerelease, callback)
     end
 
     local sceduled_callback = vim.schedule_wrap(callback)
-    get_service_resource("SearchQueryService", function(search_url, search_err)
+    get_service_resource(endpoints.resources.search_query, function(search_url, search_err)
         if search_err then
             sceduled_callback(nil, search_err)
             return

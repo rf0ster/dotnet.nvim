@@ -14,15 +14,13 @@
 
 local M  = {}
 
-
 local manager = require "dotnet.manager"
 local config = require "dotnet.nuget.config"
 local utils = require "dotnet.utils"
 local nuget_picker = require "dotnet.nuget.nuget_picker"
 local fuzzy = require "dotnet.nuget.fuzzy"
 local window = require "dotnet.nuget.window"
-local api_client_cache = require "dotnet.nuget.api_client_cache"
-local api_client_async = require "dotnet.nuget.api_async"
+local nuget_api = require "dotnet.nuget.api"
 
 function M.open(proj_file)
     local d = window.get_dimensions()
@@ -61,35 +59,49 @@ function M.open(proj_file)
         border = config.opts.ui.border,
     })
 
+    local last_search_term = nil
     local pkgs_picker = nuget_picker.create({
         row = picker_r,
         col = picker_c,
         width = picker_w,
         height = picker_h,
         values = { nil },
-        map_to_results = function(val)
-            local filtered_pkgs = fuzzy.filter(pkgs, val)
+        map_to_results_async = function(search_term, callback)
+            last_search_term = search_term
+            local sync_callback = function(vals, t)
+                if t == last_search_term then
+                    callback(vals)
+                end
+            end
+
+            local filtered_pkgs = fuzzy.filter(pkgs, search_term)
             if not filtered_pkgs or #filtered_pkgs == 0 then
-                return {}
+                sync_callback({}, search_term)
+                return
             end
 
             local outdated_pkgs = {}
             for _, pkg in ipairs(filtered_pkgs) do
-                local versions = api_client_cache.get_pkg_versions(pkg.id)
-                if versions and #versions > 0 and versions[#versions] ~= pkg.version then
-                    table.insert(outdated_pkgs, {
-                        display = pkg.id .. "@" .. pkg.version .. " -> " .. versions[#versions],
-                        value = {
-                            id = pkg.id,
-                            version = pkg.version,
-                            latest_version = versions[#versions],
-                        }
-                    })
-                end
+                nuget_api.get_pkg_base_async(pkg.id, function(data, err)
+                    if err then
+                        sync_callback(outdated_pkgs, search_term)
+                        return
+                    end
 
+                    local versions = data.versions or {}
+                    if versions and #versions > 0 and versions[#versions] ~= pkg.version then
+                        table.insert(outdated_pkgs, {
+                            display = pkg.id .. "@" .. pkg.version .. " -> " .. versions[#versions],
+                            value = {
+                                id = pkg.id,
+                                version = pkg.version,
+                                latest_version = versions[#versions],
+                            }
+                        })
+                    end
+                    sync_callback(outdated_pkgs, search_term)
+                end)
             end
-
-            return outdated_pkgs
         end,
         on_selected = function(val)
             if not M.view_bufnr then
@@ -104,7 +116,7 @@ function M.open(proj_file)
                 return
             end
 
-            api_client_async.get_pkg_registration(val.value.id, val.value.version, function(pkg)
+            nuget_api.get_pkg_registration_async(val.value.id, val.value.version, function(pkg)
                 vim.api.nvim_buf_set_option(M.view_bufnr, "modifiable", true)
                 vim.api.nvim_buf_set_lines(M.view_bufnr, 0, -1, false, {})
 
