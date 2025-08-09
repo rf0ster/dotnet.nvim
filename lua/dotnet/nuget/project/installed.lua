@@ -66,24 +66,7 @@ function M.open(proj_file)
         height = picker_h,
         values = { nil },
         map_to_results = function(val)
-            local filtered_pkgs = {}
-            if not val or val == "" then
-                filtered_pkgs = pkgs or {}
-            else
-                local query = string.match(val, "%S+")
-                if not query then
-                    filtered_pkgs = pkgs or {}
-                else
-                    for _, pkg in ipairs(pkgs or {}) do
-                        if pkg and pkg.id and pkg.version then
-                            if fuzzy.filter(query, pkg.id) then
-                                table.insert(filtered_pkgs, pkg)
-                            end
-                        end
-                    end
-
-                end
-            end
+            local filtered_pkgs = fuzzy.filter(pkgs or {}, val, function(pkg) return pkg.id end)
 
             local results = {}
             for _, pkg in ipairs(filtered_pkgs or {}) do

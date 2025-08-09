@@ -19,16 +19,27 @@ function M.fuzzy_match(needle, haystack)
     return false
 end
 
--- Filter array using fuzzy match
-function M.filter(values, search)
-    if not search or search == "" then
-        return values
+--- Filters a list of items based on a search term using a matching function.
+--- The `match_fn` function is used to extract the string to match against the search term.
+--- If the search term is empty or nil, it returns the original list of items.
+--- @param items table List of items to filter.
+--- @param search_term string term to search for in the items.
+--- @param match_fn function function that takes an item and returns the string to match against the search term.
+--- @return table|nil list of items that match the search term.
+function M.filter(items, search_term, match_fn)
+    if items == nil or #items == 0 then
+        return {}
+    end
+
+    if not search_term or search_term == "" then
+        return items
     end
 
     local results = {}
-    for _, val in ipairs(values) do
-        if M.fuzzy_match(search, val.text) then
-            table.insert(results, val)
+    for _, item in ipairs(items) do
+        local item_to_match = match_fn(item)
+        if M.fuzzy_match(search_term, item_to_match) then
+            table.insert(results, item)
         end
     end
     return results

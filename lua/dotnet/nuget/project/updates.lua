@@ -24,7 +24,7 @@ local nuget_api = require "dotnet.nuget.api"
 
 function M.open(proj_file)
     local d = window.get_dimensions()
-    local pkgs = manager.get_nuget_pkgs(proj_file)
+    local pkgs = manager.get_nuget_pkgs(proj_file) or {}
 
     local header_h = config.defaults.ui.header_h
 
@@ -74,14 +74,12 @@ function M.open(proj_file)
                 end
             end
 
-            local filtered_pkgs = fuzzy.filter(pkgs, search_term)
-            if not filtered_pkgs or #filtered_pkgs == 0 then
-                sync_callback({}, search_term)
-                return
-            end
+            local filtered_pkgs = fuzzy.filter(pkgs or {}, search_term, function(pkg)
+                return pkg.id .. "@" .. pkg.version
+            end)
 
             local outdated_pkgs = {}
-            for _, pkg in ipairs(filtered_pkgs) do
+            for _, pkg in ipairs(filtered_pkgs or {}) do
                 nuget_api.get_pkg_base_async(pkg.id, function(data, err)
                     if err then
                         sync_callback(outdated_pkgs, search_term)
