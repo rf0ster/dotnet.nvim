@@ -1,16 +1,33 @@
 local M = {}
 
+--- This function temporarily sets the buffer to modifiable, executes the action,
+--- and then restores the modifiable state.
+local function buffer_write_action(bufnr, action)
+    if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
+        return
+    end
+
+    local modifiable = vim.api.nvim_buf_get_option(bufnr, "modifiable")
+    vim.api.nvim_buf_set_option(bufnr, "modifiable", true)
+    action()
+    vim.api.nvim_buf_set_option(bufnr, "modifiable", modifiable)
+end
+
+--- Reads all the lines from a buffer.
+-- @param bufnr The buffer number to read from.
+-- @return A table containing all the lines in the buffer.
+function M.read_lines(bufnr)
+    if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
+        return {}
+    end
+
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    return lines
+end
+
 function M.delete(bufnr)
     if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
         vim.api.nvim_buf_delete(bufnr, { force = true })
-    end
-end
-
-function M.clean(bufnr)
-    if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
-        vim.api.nvim_buf_set_option(bufnr, "modifiable", true)
-        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {})
-        vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
     end
 end
 
@@ -20,18 +37,23 @@ function M.set_modifiable(bufnr, modifiable)
     end
 end
 
+function M.clear(bufnr)
+    buffer_write_action(bufnr, function()
+        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {})
+    end)
+end
+
 function M.append_lines(bufnr, lines)
-    vim.api.nvim_buf_set_option(bufnr, "modifiable", true)
-    if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+    buffer_write_action(bufnr, function()
         vim.api.nvim_buf_set_lines(bufnr, -1, -1, false, lines)
-    end
+    end)
 end
 
 function M.write(bufnr, lines)
-    if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+    buffer_write_action(bufnr, function()
         vim.api.nvim_buf_set_option(bufnr, "modifiable", true)
         vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
-    end
+    end)
 end
 
 return M

@@ -5,12 +5,11 @@ local window = require "dotnet.utils.window"
 
 function M.new(bufnr, win)
     local on_cmd_start = function()
-        buffer.clean(bufnr)
+        buffer.clear(bufnr)
     end
 
     local on_cmd_out = function(_, data, _)
         buffer.append_lines(bufnr, data)
-        buffer.set_modifiable(bufnr, false)
     end
 
     local on_cmd_exit = function()

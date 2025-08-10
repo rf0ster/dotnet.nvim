@@ -161,6 +161,7 @@ function M.create(opts)
                 if debounce_timer then
                     vim.fn.timer_stop(debounce_timer)
                 end
+
                 debounce_timer = vim.fn.timer_start(debounce, function()
                     if map_to_results_async then
                         wrapped_on_change_async()
@@ -205,13 +206,6 @@ function M.create(opts)
             wrapped_on_change()
         end
     end)
-
-    M.override_dispaly_values = function(values)
-
-
-
-
-    end
 
     return M.get_state()
 end

@@ -58,8 +58,6 @@ function M.open(proj_file)
         border = config.opts.ui.border,
     })
 
-    local version_selection = nil
-
     local pkgs_picker = nuget_picker.create({
         row = picker_r,
         col = picker_c,
@@ -78,7 +76,6 @@ function M.open(proj_file)
                 callback({})
                 return
             end
-
 
             nuget_api.get_search_query_async(query, picker_h * 2, function(pkgs)
                 if not pkgs or #pkgs == 0 then

@@ -3,7 +3,6 @@ local M = {}
 
 -- Check if all characters of `needle` appear in order in `haystack`
 function M.fuzzy_match(needle, haystack)
-    print("Fuzzy matching:", needle, "in", haystack)
     needle = needle:lower()
     haystack = haystack:lower()
 

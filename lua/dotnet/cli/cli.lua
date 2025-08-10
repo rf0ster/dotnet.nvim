@@ -102,7 +102,6 @@ function DotnetCli:run_interactive_cmd(cmd)
     self:insert_history(cmd, CMD_TYPE_INTERACTIVE)
     if self.interactive_cmd then
         self.on_interactive_start()
-        print("Calling interactive command: " .. cmd)
         self.interactive_cmd(cmd)
         self.on_interactive_exit()
     end
