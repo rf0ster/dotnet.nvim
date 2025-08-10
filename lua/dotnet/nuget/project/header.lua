@@ -40,7 +40,11 @@ function M.open(proj_file)
     })
 
     -- Set header content
-    local text = { "  (B)rowse  |  (I)nstalled  |  (U)pdates  " }
+    local header_text =  "  (B)rowse  |  (I)nstalled  |  (U)pdates  "
+    local prerelease_text = "(P)release: yes | no"
+    local padding = string.rep(" ", header_w - #header_text - #prerelease_text - 2)
+
+    local text = { header_text .. padding .. prerelease_text }
 
     vim.api.nvim_buf_set_lines(header_bufnr, 0, -1, false, text)
 
