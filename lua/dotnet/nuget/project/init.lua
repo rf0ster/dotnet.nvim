@@ -14,7 +14,7 @@
 local M = {}
 
 local header = require "dotnet.nuget.project.header"
-local tab_b = require "dotnet.nuget.project.browse_temp"
+local tab_b = require "dotnet.nuget.project.browse"
 local tab_i = require "dotnet.nuget.project.installed"
 local tab_u = require "dotnet.nuget.project.updates"
 local utils = require "dotnet.utils"
