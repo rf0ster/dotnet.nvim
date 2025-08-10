@@ -16,7 +16,7 @@ local M  = {}
 
 local config = require "dotnet.nuget.config"
 local utils = require "dotnet.utils"
-local nuget_picker = require "dotnet.nuget.nuget_picker"
+local nuget_picker = require "dotnet.nuget.picker"
 local window = require "dotnet.nuget.window"
 local nuget_api = require "dotnet.nuget.api"
 
@@ -57,6 +57,8 @@ function M.open(proj_file)
         style = config.opts.ui.style,
         border = config.opts.ui.border,
     })
+
+    local version_selection = nil
 
     local pkgs_picker = nuget_picker.create({
         row = picker_r,

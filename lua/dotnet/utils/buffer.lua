@@ -21,9 +21,16 @@ function M.set_modifiable(bufnr, modifiable)
 end
 
 function M.append_lines(bufnr, lines)
-    M.set_modifiable(bufnr, true)
+    vim.api.nvim_buf_set_option(bufnr, "modifiable", true)
     if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
         vim.api.nvim_buf_set_lines(bufnr, -1, -1, false, lines)
+    end
+end
+
+function M.write(bufnr, lines)
+    if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+        vim.api.nvim_buf_set_option(bufnr, "modifiable", true)
+        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
     end
 end
 
