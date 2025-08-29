@@ -56,4 +56,11 @@ function M.write(bufnr, lines)
     end)
 end
 
+--- Returns true if the buffer is valid
+--- @param bufnr number The buffer number to check
+--- @return boolean True if the buffer is valid, false otherwise
+function M.is_valid(bufnr)
+    return bufnr and vim.api.nvim_buf_is_valid(bufnr)
+end
+
 return M

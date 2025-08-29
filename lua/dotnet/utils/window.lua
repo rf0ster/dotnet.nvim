@@ -75,4 +75,32 @@ function M.set_cursor_end(win)
     end
 end
 
+--- Gets the current dimensions of the specified window.
+--- @param win number: Window number to get dimensions for.
+--- @return table|nil: A table containing the width, height, row, and column of the window, or nil if the window is invalid.
+---  - width (number): Width of the window.
+---  - height (number): Height of the window.
+---  - row (number): Row position of the window.
+---  - col (number): Column position of the window.
+---  - nil if the window is invalid.
+function M.get_dimensions(win)
+    if not win or not vim.api.nvim_win_is_valid(win) then
+        return nil
+    end
+    local config = vim.api.nvim_win_get_config(win)
+    return {
+        width = config.width,
+        height = config.height,
+        row = config.row,
+        col = config.col,
+    }
+end
+
+--- Returns true if the window is valid
+--- @param win number The window number to check
+--- @return boolean True if the window is valid, false otherwise
+function M.is_valid(win)
+    return win and vim.api.nvim_win_is_valid(win)
+end
+
 return M

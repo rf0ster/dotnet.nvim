@@ -11,9 +11,6 @@ local nuget_cli = require "dotnet.nuget.cli"
 
 local NugetPicker = require "dotnet.nuget.picker_temp"
 
-local function search_pkgs(search_term, callback)
-end
-
 function M.open(proj_file)
     local d = nuget_window.get_dimensions()
     local header_h = nuget_config.defaults.ui.header_h

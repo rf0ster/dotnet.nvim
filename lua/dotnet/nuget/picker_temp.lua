@@ -78,7 +78,7 @@ function Picker:new(opts)
     instance.map_to_results = opts.map_to_results or function(_) return {} end
     instance.map_to_results_async = opts.map_to_results_async
 
-    instance.results_title = opts.results_title 
+    instance.results_title = opts.results_title
     instance.keymaps = opts.keymaps or {}
     instance.debounce = opts.debounce or 100
     instance.results = {}
