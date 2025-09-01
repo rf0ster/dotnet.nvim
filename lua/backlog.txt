@@ -1,0 +1,2 @@
+? Ability to add and remove win ids dynamically to the knot
+- Return user back to nuget manger after confirming install/uninstall

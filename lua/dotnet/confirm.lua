@@ -4,6 +4,7 @@ function M.open(opts)
     local prompt = opts.prompt or {"Are you sure?"}
     local on_confirm = opts.on_confirm or function() end
     local on_cancel = opts.on_cancel or function() end
+    local on_complete = opts.on_complete or function() end
 
 	local height = #prompt + 3
 	local width = 25
@@ -24,7 +25,7 @@ function M.open(opts)
         col = col,
         style = "minimal",
         border = "double",
-        title = opts.title or "Confirm",
+        title = opts.prompt_title or "Confirm",
         title_pos = "left",
     })
 
@@ -33,10 +34,10 @@ function M.open(opts)
     vim.wo[win].cursorcolumn = false
     vim.wo[win].statusline = "Output"
     vim.wo[win].wrap = false
-    -- set_view(win)
 
+    table.insert(prompt, "")
+    table.insert(prompt, " (Y)es / (N)o ")
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, prompt)
-    vim.api.nvim_buf_set_lines(bufnr, 1, -1, false, {"", " (Y)es / (N)o "})
 
     local last_line = vim.api.nvim_buf_line_count(bufnr)
     local last_col = #vim.api.nvim_buf_get_lines(bufnr, last_line - 1, last_line, false)[1]
@@ -57,6 +58,7 @@ function M.open(opts)
         callback = function()
             vim.api.nvim_win_close(win, true)
             on_confirm()
+            on_complete()
         end
     })
     vim.api.nvim_buf_set_keymap(bufnr, "n", "n", "", {
@@ -65,6 +67,7 @@ function M.open(opts)
         callback = function()
             vim.api.nvim_win_close(win, true)
             on_cancel()
+            on_complete()
         end
     })
 end

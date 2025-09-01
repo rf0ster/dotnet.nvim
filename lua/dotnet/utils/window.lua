@@ -103,4 +103,16 @@ function M.is_valid(win)
     return win and vim.api.nvim_win_is_valid(win)
 end
 
+--- Destorys all windows in the list if they are valid.
+--- @param wins table A list of window numbers to close
+function M.destroy(wins)
+    if not wins or type(wins) ~= "table" then
+        return
+    end
+
+    for _, win in ipairs(wins) do
+        M.close(win)
+    end
+end
+
 return M

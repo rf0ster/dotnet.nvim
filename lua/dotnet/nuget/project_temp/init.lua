@@ -1,90 +1,73 @@
 local M = {}
 
-local nuget_api = require "dotnet.nuget.api"
-local buffer = require "dotnet.utils.buffer"
-local window = require "dotnet.utils.window"
 local utils = require "dotnet.utils"
+local window = require "dotnet.utils.window"
+local buffer = require "dotnet.utils.buffer"
 
-function M.new()
-    require "dotnet.nuget.windows".create({
-        map_to_results_async = function(search_term, callback)
-            if not search_term or search_term == "" then
-                callback({})
-                return
-            end
+local nuget_header = require "dotnet.nuget.project_temp.header"
+local nuget_browse = require "dotnet.nuget.project_temp.tab_browse"
+local nuget_install = require "dotnet.nuget.project_temp.tab_install"
+local nuget_update = require "dotnet.nuget.project_temp.tab_update"
 
-            local query = string.match(search_term, "%S+")
-            if not query then
-                callback({})
-                return
-            end
+--- Opens a .csproj file in the dotnet package manager UI.
+--- @param csproj_file string File path to the .csproj file to open.
+function M.open(csproj_file)
+    if not csproj_file or csproj_file == "" then
+        return
+    end
 
-            nuget_api.get_search_query_async(query, 20, function(pkgs, err)
-                if err then
-                    callback({})
-                    return
-                end
+    local tab
+    local bufs
+    local wins
+    local knot
 
-                local results = vim.tbl_map(function(pkg)
-                    pkg.is_package = true
-                    return {
-                        value = pkg,
-                        display = pkg.id .. "@" .. pkg.version,
-                    }
-                end, pkgs or {})
-                callback(results)
-            end)
-        end,
-        on_result_selected = function(val, view_buf, view_win, _, _, _)
-            if not buffer.is_valid(view_buf) or not window.is_valid(view_win) then
-                return
-            end
-
-            buffer.clear(view_buf)
-            if not val or not val.value then
-                return
-            end
-
-            local pkg = val.value
-            if pkg.is_package then
-                local content = {
-                    " ID: " .. pkg.id,
-                    " Version: " .. pkg.version,
-                    " Authors: " .. (pkg.authors[1] or ""),
-                    " Project URL: " .. (pkg.project_url or ""),
-                    " Description: "
-                }
-
-                local view_w = window.get_dimensions(view_win).width
-                local s = utils.split_smart(pkg.description or "", view_w, 3, 1)
-                for _, line in ipairs(s) do
-                    table.insert(content, line)
-                end
-
-                buffer.write(view_buf, content)
-            else
-                vim.schedule(function()
-                    nuget_api.get_pkg_registration_async(pkg.id, pkg.version, function(pkg_info)
-                        local content = {
-                            " ID: " .. pkg_info.id,
-                            " Version: " .. pkg_info.version,
-                            " Authors: " .. (pkg_info.authors[1] or ""),
-                            " Project URL: " .. (pkg_info.project_url or ""),
-                            " Description: "
-                        }
-
-                        local view_w = window.get_dimensions(view_win).width
-                        local s = utils.split_smart(pkg_info.description or "", view_w, 3, 1)
-                        for _, line in ipairs(s) do
-                            table.insert(content, line)
-                        end
-
-                        buffer.write(view_buf, content)
-                    end)
-                end)
-            end
+    -- Called every time a tab is switched to with shift + b|i|u
+    local function set_tab(opt)
+        -- Destroy all existing windows and buffers
+        if knot then
+            knot.untie()
+            knot = nil
         end
-    })
+        window.destroy(wins)
+        buffer.destroy(bufs)
+
+        -- Create new header
+        local header = nuget_header.open(csproj_file)
+        wins = { header.win }
+        bufs = { header.bufnr }
+
+        -- Load the tab that was selected
+        if opt == 0 then
+            header.tab(0)
+            tab = nuget_browse.new(csproj_file)
+        elseif opt == 1 then
+            header.tab(1)
+            tab = nuget_install.open(csproj_file)
+        elseif opt == 2 then
+            header.tab(2)
+            tab = nuget_update.open(csproj_file)
+        end
+
+        -- Create a knot of all the windows so that if
+        -- one is closed, all are closed
+        for _, win in ipairs(tab.windows) do
+            table.insert(wins, win)
+        end
+        utils.create_knot(wins)
+
+        -- Set keymaps in all buffers to switch tabs
+        for _, buf in ipairs(tab.buffers) do
+            table.insert(bufs, buf)
+        end
+        utils.set_keymaps(bufs, {
+            { mode = "n", key = "B", callback = function() set_tab(0) end },
+            { mode = "n", key = "I", callback = function() set_tab(1) end },
+            { mode = "n", key = "U", callback = function() set_tab(2) end },
+        })
+    end
+
+    -- Initialize with the browse tab
+    set_tab(0)
 end
 
 return M

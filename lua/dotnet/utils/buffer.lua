@@ -51,7 +51,6 @@ end
 
 function M.write(bufnr, lines)
     buffer_write_action(bufnr, function()
-        vim.api.nvim_buf_set_option(bufnr, "modifiable", true)
         vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
     end)
 end
@@ -61,6 +60,17 @@ end
 --- @return boolean True if the buffer is valid, false otherwise
 function M.is_valid(bufnr)
     return bufnr and vim.api.nvim_buf_is_valid(bufnr)
+end
+
+--- Destroys all buffers in the list if they are valid.
+--- @param bufs table A list of buffer numbers to delete
+function M.destroy(bufs)
+    if not bufs or type(bufs) ~= "table" then
+        return
+    end
+    for _, buf in ipairs(bufs) do
+        M.delete(buf)
+    end
 end
 
 return M
