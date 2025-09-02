@@ -16,7 +16,7 @@ function M.new(bufnr, win)
         window.set_cursor_end(win)
     end
 
-    local cli = require "dotnet.cli.cli":new({
+    local cli = require "dotnet.cli":new({
         on_cmd_start = on_cmd_start,
         on_cmd_stdout = on_cmd_out,
         on_cmd_stderr = on_cmd_out,

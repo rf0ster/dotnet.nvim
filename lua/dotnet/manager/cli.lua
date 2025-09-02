@@ -27,7 +27,7 @@ function M.get_cli()
         return cli
     end
 
-    cli = require "dotnet.cli.cli":new({
+    cli = require "dotnet.cli":new({
         on_cmd_start = on_cmd_start,
         on_cmd_stdout = on_cmd_out,
         on_cmd_stderr = on_cmd_out

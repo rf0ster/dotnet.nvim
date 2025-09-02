@@ -3,6 +3,8 @@
 -- User can select a command to run it again.
 local M = {}
 
+--- Opens a telescope picker with historical .NET CLI commands.
+--- User can select a command to run it again.
 function M.open()
     local cli = require "dotnet.manager.cli".get_cli()
 
@@ -16,7 +18,7 @@ function M.open()
     local commands = cli:get_history()
 
     pickers.new({}, {
-        prompt_title = "Historical Commands",
+        prompt_title = "History",
         results_title = "Select a command to run",
         initial_mode = "normal",
         layout_strategy = "vertical",
@@ -47,5 +49,10 @@ function M.open()
     }):find()
 end
 
-return M
+--- Runs the last command in the history.
+function M.run_last_cmd()
+    local cli = require "dotnet.manager.cli".get_cli()
+    cli:run_last_cmd()
+end
 
+return M

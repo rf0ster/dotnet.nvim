@@ -3,7 +3,7 @@ local M = {}
 local parser = require "dotnet.test_runner.parser"
 local manager = require "dotnet.manager"
 local utils = require "dotnet.utils"
-local cli = require "dotnet.cli"
+local DotnetCli = require "dotnet.cli"
 
 -- creates a namespace for the circle markers
 local ns_id = vim.api.nvim_create_namespace("circle_namespace")
@@ -99,8 +99,10 @@ local function load_tests()
         sln_name = sln.sln_name, -- Get relative path
     }
     M.tests = {}
+
+    local cli = DotnetCli:new({})
     for _, project in ipairs(sln.projects) do
-        local output = cli.test_list_all(project.path_abs)
+        local output = cli:test_list_all(project.path_abs)
         if not output then
             break
         end

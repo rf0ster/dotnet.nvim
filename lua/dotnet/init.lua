@@ -28,9 +28,9 @@ M.setup = function(config)
         elseif opts.args == "tests" then
             require "dotnet.test_runner".open()
         elseif opts.args == "history" then
-            require "dotnet.cli.history".open()
+            require "dotnet.manager.history".open()
         elseif opts.args == "last_cmd" then
-            require "dotnet.manager.cli".get_cli():run_last_cmd()
+            require "dotnet.manager.history".run_last_cmd()
         end
     end, { nargs = 1 })
 end
