@@ -1,2 +1,6 @@
+- Fix spacing on output to remove new line markers
+- Move everyone over to new cli
+- Show versions in tabs
 ? Ability to add and remove win ids dynamically to the knot
 - Return user back to nuget manger after confirming install/uninstall
+- nuget config

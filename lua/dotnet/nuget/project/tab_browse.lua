@@ -5,6 +5,7 @@ local M = {}
 local utils = require "dotnet.utils"
 local buffer = require "dotnet.utils.buffer"
 local window = require "dotnet.utils.window"
+local display = require "dotnet.nuget.project.display"
 local nuget_api = require "dotnet.nuget.api"
 local nuget_win = require "dotnet.nuget.windows"
 local nuget_cli = require "dotnet.nuget.cli"
@@ -42,39 +43,64 @@ local function map_results_async(search_term, callback)
     end)
 end
 
---- Maps package details to the view buffer.
---- @param pkg table package info to display.
---- @param view_buf number buffer to write the package details to.
---- @param view_win number window associated with the view buffer.
-local function map_pkg_to_view(pkg, view_buf, view_win)
-    local content = {
-        " ID: " .. pkg.id,
-        " Version: " .. pkg.version,
-        " Authors: " .. (pkg.authors[1] or ""),
-        " Project URL: " .. (pkg.project_url or ""),
-        " Description: "
-    }
-
-    local view_w = window.get_dimensions(view_win).width
-    local s = utils.split_smart(pkg.description or "", view_w, 3, 1)
-    for _, line in ipairs(s) do
-        table.insert(content, line)
+local showing_versions = false
+--- Keymap to switch between showing package versions or latest packages.
+--- @param val table The current selected value from the picker.
+--- @param picker table The picker instance to refresh or update results.
+local function toggle_show_versions(val, picker)
+    if showing_versions then
+        showing_versions = false
+        picker:refresh_results()
+        return
     end
 
-    buffer.write(view_buf, content)
+    showing_versions = true
+    if not val or not val.value then
+        return
+    end
+    local pkg = val.value
+    local new_results = {
+        {
+            value = pkg,
+            display = pkg.id .. "@" .. pkg.version,
+        }
+    }
+    for i = #pkg.versions - 1, 1, -1 do
+        local v = pkg.versions[i]
+        table.insert(new_results, {
+            value =  { id = pkg.id, version = v.version, is_package = false },
+            display = "   - " .. v.version,
+        })
+    end
+    picker:set_display_values(new_results)
 end
 
---- Asynchronously fetches a package id verions and maps its details to the view buffer.
---- @param pkg table package with id and version to fetch details for.
---- @param view_buf number buffer to write the package details to.
---- @param view_win number window associated with the view buffer.
-local function map_pkg_version_to_view(pkg, view_buf, view_win)
-    vim.schedule(function()
-        nuget_api.get_pkg_registration_async(pkg.id, pkg.version, function(pkg_info)
-            map_pkg_to_view(pkg_info, view_buf, view_win)
+--- Maps the selected package to its detailed view.
+--- @param selected table selected package from the picker.
+--- @param view_bufnr number buffer number of the view window.
+--- @param view_win number window ID of the view window.
+local function on_result_selected(selected, view_bufnr, view_win)
+    if not buffer.is_valid(view_bufnr) or not window.is_valid(view_win) then
+        return
+   end
+
+    buffer.clear(view_bufnr)
+    if not selected or not selected.value then
+        return
+    end
+
+    local pkg = selected.value
+    if pkg.is_package then
+        display.package(pkg, view_bufnr, view_win)
+    else
+        vim.schedule(function()
+            nuget_api.get_pkg_registration_async(pkg.id, pkg.version, function(pkg_info)
+                display.package(pkg_info, view_bufnr, view_win)
+            end)
         end)
-    end)
+    end
 end
+
 --- Initializes and opens the NuGet package browsing interface.
 -- It sets up the necessary callbacks for searching and selecting packages.
 -- @param proj_file The full project file path.
@@ -91,24 +117,8 @@ function M.new(proj_file)
         width = dimensions.picker.width,
         row = dimensions.picker.row,
         col = dimensions.picker.col,
-        on_result_selected = function(selected)
-            if not buffer.is_valid(view_bufnr) or not window.is_valid(view_win) then
-                return
-           end
-
-            buffer.clear(view_bufnr)
-            if not selected or not selected.value then
-                return
-            end
-
-            local pkg = selected.value
-            if pkg.is_package then
-                map_pkg_to_view(pkg, view_bufnr, view_win)
-            else
-                map_pkg_version_to_view(pkg, view_bufnr, view_win)
-            end
-        end,
         map_to_results_async = map_results_async,
+        on_result_selected = function(selected) on_result_selected(selected, view_bufnr, view_win) end,
         keymaps = {
             {
                 key = "<leader>i",
@@ -116,6 +126,10 @@ function M.new(proj_file)
                     local cli = nuget_cli.new(output_bufnr, output_win)
                     cli:add_package(proj_file, val.value.id, val.value.version)
                 end
+            },
+            {
+                key = "<leader>v",
+                callback = function(val) toggle_show_versions(val, picker) end
             }
         }
     })

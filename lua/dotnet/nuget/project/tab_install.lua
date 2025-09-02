@@ -1,3 +1,4 @@
+--- Description: Module for managing the installation of NuGet packages into a .csproj file.
 local M = {}
 
 local buffer = require "dotnet.utils.buffer"
@@ -7,6 +8,7 @@ local fuzzy = require "dotnet.nuget.fuzzy"
 local api = require "dotnet.nuget.api"
 local confirm = require "dotnet.confirm"
 local cli = require "dotnet.nuget.cli"
+local display = require "dotnet.nuget.project.display"
 
 --- Given a search term, filters through the list of installed packages
 --- and maps the results to a format suitable for display in the picker.
@@ -59,20 +61,7 @@ local function on_result_selected(val, view_bufnr, view_win)
                 "Failed to fetch package information."
             })
         else
-            buffer.write(view_bufnr, {
-                "Package Information",
-                "===================",
-                "",
-                " ID: " .. pkg.id,
-                " Version: " .. pkg.version,
-                " Authors: " .. (pkg.authors or "Unknown"),
-                " Description: ",
-            })
-
-            local w = window.get_dimensions(view_win).width
-            local s = utils.split_smart(pkg.description, w, 3, 1)
-
-            buffer.append_lines(view_bufnr,  s)
+            display.package(pkg, view_bufnr, view_win)
         end
     end)
 end

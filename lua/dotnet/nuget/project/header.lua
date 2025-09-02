@@ -1,3 +1,4 @@
+
 -- Creates the header component for the nuget manager
 -- 
 -- * header ***********************
@@ -15,17 +16,12 @@
 local M = {}
 
 local config = require "dotnet.nuget.config"
-local window = require "dotnet.nuget.window"
+local window = require "dotnet.nuget.windows"
+local buffer = require "dotnet.utils.buffer"
 
 function M.open(proj_file)
     -- Calculate window dimensions
     local d = window.get_dimensions()
-
-    -- Calculate dimensions for each component
-    local header_h = config.defaults.ui.header_h
-    local header_w = d.width
-    local header_r = d.row
-    local header_c = d.col
 
     local header_bufnr = vim.api.nvim_create_buf(false, true)
     local header_win = vim.api.nvim_open_win(header_bufnr, true, {
@@ -33,22 +29,22 @@ function M.open(proj_file)
         relative = "editor",
         style = config.opts.ui.style,
         border = config.opts.ui.border,
-        height = header_h,
-        width = header_w,
-        row = header_r,
-        col = header_c,
+        height = d.header.height,
+        width = d.header.width,
+        row = d.header.row,
+        col = d.header.col,
     })
 
     -- Set header content
     local header_text =  "  (B)rowse  |  (I)nstalled  |  (U)pdates  "
     local prerelease_text = "(P)release: yes | no"
-    local padding = string.rep(" ", header_w - #header_text - #prerelease_text - 2)
+    local padding = string.rep(" ", d.header.width - #header_text - #prerelease_text - 2)
 
     local text = { header_text .. padding .. prerelease_text }
-
     vim.api.nvim_buf_set_lines(header_bufnr, 0, -1, false, text)
 
     local function tab(opt)
+        buffer.set_modifiable(header_bufnr, true)
         local opt_text
         if opt == 0 then
             opt_text = "(B)rowse"
@@ -71,6 +67,7 @@ function M.open(proj_file)
         local end_col = start_col + #opt_text + 2
         vim.api.nvim_buf_add_highlight(header_bufnr, -1, "Visual", 0, start_col, end_col)
 
+        buffer.set_modifiable(header_bufnr, false)
     end
 
     return {

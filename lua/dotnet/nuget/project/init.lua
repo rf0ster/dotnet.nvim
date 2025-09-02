@@ -1,117 +1,73 @@
--- Creates nuget manager
--- 
--- * header ***********************
--- * browse | installed | updates *
--- ********************************
--- * search     * view            *
--- **************                 *
--- * packages   *                 *
--- *            *                 *
--- *            *                 *
--- ********************************
--- * output                       *
--- ********************************
 local M = {}
 
-local header = require "dotnet.nuget.project.header"
-local tab_b = require "dotnet.nuget.project.browse"
-local tab_i = require "dotnet.nuget.project.installed"
-local tab_u = require "dotnet.nuget.project.updates"
 local utils = require "dotnet.utils"
+local window = require "dotnet.utils.window"
+local buffer = require "dotnet.utils.buffer"
 
--- opens the nuget manager
-function M.open(proj_file)
-    M.close()
-    M.header = header.open(proj_file)
-    M.proj_file = proj_file
-    M.open_tab(0)
-end
+local nuget_header = require "dotnet.nuget.project.header"
+local nuget_browse = require "dotnet.nuget.project.tab_browse"
+local nuget_install = require "dotnet.nuget.project.tab_install"
+local nuget_update = require "dotnet.nuget.project.tab_update"
 
--- closes the nuget manager
-function M.close()
-    M.close_tab()
-    if M.header then
-        local win = M.header.win
-        local buf = M.header.bufnr
-        if win and vim.api.nvim_win_is_valid(win) then
-            vim.api.nvim_win_close(win, true)
-        end
-        if buf and vim.api.nvim_buf_is_valid(buf) then
-            vim.api.nvim_buf_delete(buf, { force = true })
-        end
-    end
-    M.header = nil
-    M.proj_file = nil
-end
-
--- closes the current tab
-function M.close_tab()
-    if M.knot then
-        M.knot.untie()
-        M.knot = nil
-    end
-
-    if M.tab and M.tab.close then
-        M.tab.close()
-    end
-end
-
--- selects the tab to be opened
-function M.open_tab(opt)
-    if not M.header or not M.proj_file then
+--- Opens a .csproj file in the dotnet package manager UI.
+--- @param csproj_file string File path to the .csproj file to open.
+function M.open(csproj_file)
+    if not csproj_file or csproj_file == "" then
         return
     end
 
-    if opt < 0 or opt > 2 then
-        return
-    end
+    local tab
+    local bufs
+    local wins
+    local knot
 
-    M.close_tab()
-    M.header.tab(opt)
-
-    if opt == 0 then
-        M.tab = tab_b.open(M.proj_file)
-    elseif opt == 1 then
-        M.tab = tab_i.open(M.proj_file)
-    elseif opt == 2 then
-        M.tab = tab_u.open(M.proj_file)
-    end
-
-    local bufs = {M.header.bufnr}
-    if M.tab and M.tab.bufs then
-        for _, buf in ipairs(M.tab.bufs) do
-            if buf ~= nil and vim.api.nvim_buf_is_valid(buf) then
-                table.insert(bufs, buf)
-            end
+    -- Called every time a tab is switched to with shift + b|i|u
+    local function set_tab(opt)
+        -- Destroy all existing windows and buffers
+        if knot then
+            knot.untie()
+            knot = nil
         end
-    end
+        window.destroy(wins)
+        buffer.destroy(bufs)
 
-    -- set each buffer to map shift commands to switch tabs
-    utils.set_keymaps(bufs, {
-        { mode = "n", key = "B", callback = function() M.open_tab(0) end },
-        { mode = "n", key = "I", callback = function() M.open_tab(1) end },
-        { mode = "n", key = "U", callback = function() M.open_tab(2) end },
-    })
+        -- Create new header
+        local header = nuget_header.open(csproj_file)
+        wins = { header.win }
+        bufs = { header.bufnr }
 
-    -- Create a knot for all the new windows in the tab.
-    -- This makes sure that when one of the windows is closed, all are closed.
-    local wins = {M.header.win}
-    if M.tab and M.tab.wins then
-        for _, win in ipairs(M.tab.wins) do
-            if win ~= nil and vim.api.nvim_win_is_valid(win) then
-                table.insert(wins, win)
-            end
+        -- Load the tab that was selected
+        if opt == 0 then
+            header.tab(0)
+            tab = nuget_browse.new(csproj_file)
+        elseif opt == 1 then
+            header.tab(1)
+            tab = nuget_install.open(csproj_file)
+        elseif opt == 2 then
+            header.tab(2)
+            tab = nuget_update.open(csproj_file)
         end
-    end
-    -- print wins
-    M.knot = utils.create_knot(wins)
 
-    -- set foucus on the first window
-    if M.tab and M.tab.wins and #M.tab.wins > 0 then
-        vim.api.nvim_set_current_win(M.tab.wins[1])
-    else
-        vim.api.nvim_set_current_win(M.header.win)
+        -- Create a knot of all the windows so that if
+        -- one is closed, all are closed
+        for _, win in ipairs(tab.windows) do
+            table.insert(wins, win)
+        end
+        utils.create_knot(wins)
+
+        -- Set keymaps in all buffers to switch tabs
+        for _, buf in ipairs(tab.buffers) do
+            table.insert(bufs, buf)
+        end
+        utils.set_keymaps(bufs, {
+            { mode = "n", key = "B", callback = function() set_tab(0) end },
+            { mode = "n", key = "I", callback = function() set_tab(1) end },
+            { mode = "n", key = "U", callback = function() set_tab(2) end },
+        })
     end
+
+    -- Initialize with the browse tab
+    set_tab(0)
 end
 
 return M

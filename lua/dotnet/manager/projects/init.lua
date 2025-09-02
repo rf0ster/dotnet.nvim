@@ -3,9 +3,9 @@
 
 local M = {}
 
-local dotnet_nuget_project = require "dotnet.nuget.project"
 local dotnet_manager = require "dotnet.manager"
 local dotnet_confirm = require "dotnet.confirm"
+local nuget = require "dotnet.nuget.project"
 local cli = require "dotnet.manager.cli".get_cli()
 
 local finders = require "telescope.finders"
@@ -120,7 +120,7 @@ function M.open()
                 if not project then
                     return
                 end
-                dotnet_nuget_project.open(project.path_abs)
+                nuget.open(project.path_abs)
             end)
             map("n", "b", function()
                 local project = actions_state.get_selected_entry().value
