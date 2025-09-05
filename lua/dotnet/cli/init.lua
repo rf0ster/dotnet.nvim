@@ -139,8 +139,24 @@ end
 --- Builds a .NET project or solution.
 --- @param target string|nil The path to the project or solution file. Builds from local directory if nil.
 --- @param configuration string|nil The build configuration (e.g., "Debug", "Release"). Defaults to "Debug" if nil
-function DotnetCli:build(target, configuration)
-    self:run_cmd("dotnet build" .. add_target(target) .. add_flag("-c", configuration))
+function DotnetCli:build(target, configuration, runtime)
+    self:run_cmd("dotnet build" .. add_target(target) .. add_flag("-c", configuration) .. add_flag("-r", runtime))
+end
+
+--- Publishes a .NET project or solution.
+--- @param target string|nil The path to the project or solution file. Publishes from local directory if nil.
+--- @param configuration string|nil The build configuration (e.g., "Debug", "Release"). Defaults to "Release" if nil
+--- @param runtime string|nil The target runtime identifier (e.g., "win-x64", "linux-x64"). If nil, framework-dependent
+--- @param output string|nil The output directory for the published files. If nil, uses default publish directory
+function DotnetCli:publish(target, configuration, runtime, output)
+    local cmd = "dotnet publish" .. add_target(target) .. add_flag("-c", configuration or "Release")
+    if runtime then
+        cmd = cmd .. add_flag("-r", runtime)
+    end
+    if output then
+        cmd = cmd .. add_flag("-o", output)
+    end
+    self:run_cmd(cmd)
 end
 
 --- Restores a .NET project or solution.
@@ -260,7 +276,6 @@ end
 function DotnetCli:run_project(target)
     self:run_interactive_cmd("dotnet run " .. add_param("project", target))
 end
-
 --- Runs tests for a .NET project or solution using MSTest.
 --- @param target string|nil The path to the project or solution file. Runs tests from local directory if nil.
 --- @param filter string|nil The test filter expression. If nil, no filter is applied.

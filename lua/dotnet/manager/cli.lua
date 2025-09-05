@@ -8,11 +8,11 @@ local cli
 local win
 local bufnr
 
-local function on_cmd_start()
+local function on_cmd_start(cmd)
     window.close(win)
     buffer.delete(bufnr)
 
-    bufnr, win = window.create()
+    bufnr, win = window.create({ title = cmd or "dotnet" })
     buffer.set_modifiable(bufnr, false)
     utils.create_knot({ win })
 end

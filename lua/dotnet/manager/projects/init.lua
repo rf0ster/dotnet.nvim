@@ -7,6 +7,7 @@ local dotnet_manager = require "dotnet.manager"
 local dotnet_confirm = require "dotnet.confirm"
 local nuget = require "dotnet.nuget.project"
 local cli = require "dotnet.manager.cli".get_cli()
+local submenu = require "dotnet.manager.projects.submenu"
 
 local finders = require "telescope.finders"
 local pickers = require "telescope.pickers"
@@ -20,6 +21,7 @@ local function pad(str, length)
     end
     return str .. string.rep(" ", length - #str)
 end
+
 
 function M.open()
     local sln_info = dotnet_manager.load_solution()
@@ -106,14 +108,14 @@ function M.open()
                 display_rel = not display_rel
                 reload_picker(prompt_bufnr)
             end)
-            map("n", "<CR>", function(prompt_buffrn)
+            map("n", "<CR>", function(prompt_bufnr)
                 local project = actions_state.get_selected_entry().value
-                actions.close(prompt_buffrn)
+                actions.close(prompt_bufnr)
 
                 if not project then
                     return
                 end
-                vim.api.nvim_command("e " .. project.path_abs)
+                submenu.open(project)
             end)
             map("n", "n", function()
                 local project = actions_state.get_selected_entry().value

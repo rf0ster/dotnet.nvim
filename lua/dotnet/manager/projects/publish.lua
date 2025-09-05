@@ -1,30 +1,28 @@
 -- Description: Module that uses Telescope windows to navigate the
--- user through build configuration steps before running a build command.
+-- user through publish configuration steps before running a publish command.
 local M = {}
-
 
 local cli = require "dotnet.manager.cli".get_cli()
 local runtime_selector = require "dotnet.manager.projects.runtime"
 local pickers = require "telescope.pickers"
 local finders = require "telescope.finders"
-local actions = require "telescope.actions"
 local actions_state = require "telescope.actions.state"
 
---- Given the project, open the build manager
---- @param project table The project to open the build manager for
+--- Given the project, open the publish manager
+--- @param project table The project to open the publish manager for
 function M.open(project)
     if not project then
         return
     end
 
-    -- Create Telescope picker for build configuration options
-    local build_options = {
-        { name = "Debug",   action = function() runtime_selector.open(project, "Debug", "Build") end },
-        { name = "Release", action = function() runtime_selector.open(project, "Release", "Build") end },
+    -- Create Telescope picker for publish configuration options
+    local publish_options = {
+        { name = "Debug",   action = function() runtime_selector.open(project, "Debug", "Publish") end },
+        { name = "Release", action = function() runtime_selector.open(project, "Release", "Publish") end },
     }
 
     local finder = finders.new_table {
-        results = build_options,
+        results = publish_options,
         entry_maker = function(entry)
             return {
                 value = entry,
@@ -35,7 +33,7 @@ function M.open(project)
     }
 
     pickers.new({}, {
-        prompt_title = "Build Configuration for " .. project.name,
+        prompt_title = "Publish Configuration for " .. project.name,
         initial_mode = "normal",
         finder = finder,
         layout_strategy = "vertical",
