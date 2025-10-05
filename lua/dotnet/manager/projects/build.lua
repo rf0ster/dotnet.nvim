@@ -1,28 +1,32 @@
--- Description: Module that uses Telescope windows to navigate the
--- user through build configuration steps before running a build command.
+-- Description: Module that allows users to build up a dotnet build command
+-- by selecting options interactively through Telescope pickers.
+
 local M = {}
 
-
-local cli = require "dotnet.manager.cli".get_cli()
-local runtime_selector = require "dotnet.manager.projects.runtime"
 local pickers = require "telescope.pickers"
 local finders = require "telescope.finders"
 local actions = require "telescope.actions"
 local actions_state = require "telescope.actions.state"
 
---- Given the project, open the build manager
---- @param project table The project to open the build manager for
+-- Available dotnet build options
+local build_options = {
+    { name = "configuration" },
+    { name = "runtime" },
+    { name = "framework" },
+    { name = "output" },
+    { name = "verbosity" },
+    { name = "no-restore" },
+    { name = "no-dependencies" },
+    { name = "force" },
+    { name = "no-incremental" },
+    { name = "self-contained" },
+}
+
+-- Public function to open the build command builder
 function M.open(project)
     if not project then
         return
     end
-
-    -- Create Telescope picker for build configuration options
-    local build_options = {
-        { name = "Debug",   action = function() runtime_selector.open(project, "Debug", "Build") end },
-        { name = "Release", action = function() runtime_selector.open(project, "Release", "Build") end },
-    }
-
     local finder = finders.new_table {
         results = build_options,
         entry_maker = function(entry)
@@ -33,10 +37,9 @@ function M.open(project)
             }
         end,
     }
-
     pickers.new({}, {
-        prompt_title = "Build Configuration for " .. project.name,
-        initial_mode = "normal",
+        prompt_title = "Build Options for " .. project.name,
+        results_title = "Select build option",
         finder = finder,
         layout_strategy = "vertical",
         layout_config = {
@@ -45,9 +48,12 @@ function M.open(project)
             height = 0.5,
         },
         attach_mappings = function(_, map)
-            map("n", "<CR>", function()
+            map("n", "<CR>", function(prompt_bufnr)
                 local selection = actions_state.get_selected_entry()
-                selection.value.action()
+                actions.close(prompt_bufnr)
+
+                -- For now, just print what was selected
+                print("Selected: " .. selection.value.name)
             end)
             return true
         end,

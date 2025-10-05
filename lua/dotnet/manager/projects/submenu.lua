@@ -10,7 +10,10 @@ local sorters = require "telescope.sorters"
 local actions = require "telescope.actions"
 local actions_state = require "telescope.actions.state"
 
-function M.open(project)
+local dotnet_confirm = require "dotnet.confirm"
+local dotnet_manager = require "dotnet.manager"
+
+function M.open(sln, project)
     if not project then
         return
     end
@@ -23,6 +26,16 @@ function M.open(project)
         { name = "NuGet", action = function() require "dotnet.nuget.project".open(project.path_abs) end },
         { name = "Clean", action = function() cli:clean(project.path_abs) end },
         { name = "Restore", action = function() cli:restore(project.path_abs) end },
+        { name = "Delete", action = function()
+            dotnet_confirm.open({
+                prompt_title = "Delete Project",
+                prompt = {"Delete " .. project.path_rel ..  " from " .. sln.sln_name .. "?"},
+                on_confirm = function()
+                    cli:sln_remove(sln.sln_path_abs, project.path_abs)
+                    dotnet_manager.load_solution()
+                end
+            })
+        end },
     }
 
     local function entry_maker(entry)
@@ -34,7 +47,7 @@ function M.open(project)
     end
 
     pickers.new({}, {
-        prompt_title = "Project Actions: " .. project.name,
+        prompt_title = "Project Menu: " .. project.name,
         results_title = "Select an action",
         finder = finders.new_table {
             results = submenu_options,
@@ -57,38 +70,6 @@ function M.open(project)
                     selection.value.action()
                 end
             end)
-            
-            -- Keymap for each option using first letter
-            map("n", "o", function(prompt_bufnr)
-                actions.close(prompt_bufnr)
-                vim.api.nvim_command("e " .. project.path_abs)
-            end)
-            
-            map("n", "b", function(prompt_bufnr)
-                actions.close(prompt_bufnr)
-                require "dotnet.manager.projects.build".open(project)
-            end)
-            
-            map("n", "p", function(prompt_bufnr)
-                actions.close(prompt_bufnr)
-                require "dotnet.manager.projects.publish".open(project)
-            end)
-            
-            map("n", "n", function(prompt_bufnr)
-                actions.close(prompt_bufnr)
-                require "dotnet.nuget.project".open(project.path_abs)
-            end)
-            
-            map("n", "c", function(prompt_bufnr)
-                actions.close(prompt_bufnr)
-                cli:clean(project.path_abs)
-            end)
-            
-            map("n", "r", function(prompt_bufnr)
-                actions.close(prompt_bufnr)
-                cli:restore(project.path_abs)
-            end)
-            
             return true
         end,
     }):find()

@@ -8,6 +8,7 @@
 - Readme
 - cleanup utils
 - Test runner is using hardocde dotnet test command
+- Dotnet solution new commands
 
 
 *** Nuget Solution Manager ***

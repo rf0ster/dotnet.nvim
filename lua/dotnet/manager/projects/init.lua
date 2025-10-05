@@ -88,8 +88,8 @@ function M.open()
     end
 
     pickers.new({}, {
-        prompt_title = sln_info.sln_name,
-        results_title = "Projects (n)uget - (b)uild - (c)lean - (r)estore - (d)elete",
+        prompt_title = sln_info.sln_name .. " projects",
+        results_title = "(m)enu - (n)uget - (b)uild - (c)lean - (r)estore",
         finder = finders.new_table {
             results = get_results_display(),
             entry_maker = entry_maker,
@@ -108,6 +108,15 @@ function M.open()
                 display_rel = not display_rel
                 reload_picker(prompt_bufnr)
             end)
+            map("n", "m", function(prompt_bufnr)
+                local project = actions_state.get_selected_entry().value
+                actions.close(prompt_bufnr)
+
+                if not project then
+                    return
+                end
+                submenu.open(sln_info, project)
+            end)
             map("n", "<CR>", function(prompt_bufnr)
                 local project = actions_state.get_selected_entry().value
                 actions.close(prompt_bufnr)
@@ -115,7 +124,7 @@ function M.open()
                 if not project then
                     return
                 end
-                submenu.open(project)
+                submenu.open(sln_info, project)
             end)
             map("n", "n", function()
                 local project = actions_state.get_selected_entry().value
@@ -153,21 +162,6 @@ function M.open()
 
                 actions.close(prompt_bufnr)
                 vim.schedule(function() cli:run_project(project.path_abs) end)
-            end)
-            map("n", "d", function()
-                local project = actions_state.get_selected_entry().value
-                if not project then
-                    return
-                end
-
-                dotnet_confirm.open({
-                    prompt_title = "Delete Project",
-                    prompt = {"Delete " .. project.path_rel ..  " from " .. sln_info.sln_name .. "?"},
-                    on_confirm = function()
-                        cli:sln_remove(sln_info.sln_path_abs, project.path_abs)
-                        dotnet_manager.load_solution()
-                    end
-                })
             end)
             return true
         end,
