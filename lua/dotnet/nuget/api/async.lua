@@ -20,21 +20,20 @@ local endpoints = require "dotnet.nuget.api.endpoints"
 --- end
 --- get("https://api.nuget.org/v3/index.json", handle_result)
 local function get(url, callback)
-    require "plenary.job":new({
-        command = "curl",
-        args = { "-s", url },
-        on_exit = function(job, code)
-            local result = job:result()
-            vim.schedule(function()
-                if code == 0 then
-                    local data = vim.fn.json_decode(result)
+    vim.system({ "curl", "-s", url }, { text = true }, function(obj)
+        vim.schedule(function()
+            if obj.code == 0 then
+                local ok, data = pcall(vim.json.decode, obj.stdout)
+                if ok then
                     callback(data)
                 else
-                    callback(nil, "Failed to fetch data from " .. url)
+                    callback(nil, "Failed to decode response from " .. url)
                 end
-            end)
-        end,
-    }):start()
+            else
+                callback(nil, "Failed to fetch data from " .. url)
+            end
+        end)
+    end)
 end
 
 --- Fetches the NuGet service index asynchronously.

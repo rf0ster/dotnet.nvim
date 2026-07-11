@@ -140,9 +140,9 @@ function M.open()
         for _, project in ipairs(sln_info.projects or {}) do
             local display = pad(project.name, max_length)
             if display_rel then
-                display = display .. " " .. project.path_rel
+                display = display .. "  " .. project.path_rel
             else
-                display = display .. " " .. project.path_abs
+                display = display .. "  " .. project.path_abs
             end
             table.insert(results, {
                 value = project,

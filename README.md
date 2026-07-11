@@ -21,6 +21,7 @@ Designed for .NET Core 8.0 and above, it provides an integrated experience for .
 ```lua
 {
   "rf0ster/netcore.nvim",
+  dependencies = { "nvim-telescope/telescope.nvim" },
   config = function()
     require("netcore").setup()
   end,
@@ -32,6 +33,7 @@ Designed for .NET Core 8.0 and above, it provides an integrated experience for .
 ```lua
 use {
   "rf0ster/netcore.nvim",
+  requires = { "nvim-telescope/telescope.nvim" },
   config = function()
     require("netcore").setup()
   end
@@ -41,6 +43,7 @@ use {
 ### Using [vim-plug](https://github.com/junegunn/vim-plug)
 
 ```vim
+Plug 'nvim-telescope/telescope.nvim'
 Plug 'rf0ster/netcore.nvim'
 
 lua << EOF
@@ -118,7 +121,8 @@ vim.keymap.set("n", "<leader>pf", "<cmd>Dotnet proj_ref<CR>", { desc = "Referenc
 
 - Neovim >= 0.11.0
 - .NET SDK installed and available in PATH for netcore +8.0
-- LuaRocks (for dependencies)
+- [telescope.nvim](https://github.com/nvim-telescope/telescope.nvim) (used for the pickers)
+- `curl` on your PATH (used for NuGet API requests)
 
 ## Solution Manager
 

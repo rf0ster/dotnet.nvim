@@ -194,6 +194,10 @@ M.clean_line = function(line)
     end
 
     if line ~= "" then
+        -- Strip ANSI/VT escape sequences (colour codes, cursor hide/show, erase
+        -- line, cursor moves). The dotnet CLI emits these and they render as
+        -- garbage in a normal buffer.
+        line = line:gsub("\27%[[%d;?]*%a", "")
         -- Replace carriage return (^M) with nothing
         -- Is this only on windows??
         line = string.gsub(line, "\r", "")
@@ -201,6 +205,11 @@ M.clean_line = function(line)
         line = line:gsub("^%s+", ""):gsub("%s+$", "")
         -- Add indentation
         line = " " .. line
+    end
+
+    -- A line that was only escape codes / whitespace collapses to blank.
+    if line:match("^%s*$") then
+        line = ""
     end
 
     return line

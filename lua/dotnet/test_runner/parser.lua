@@ -1,82 +1,86 @@
 local M = {}
 
-local xml2lua = require("xml2lua")
-local handler = require("xmlhandler.tree")
+-- Decodes the five predefined XML entities. `&amp;` must be decoded last so
+-- that an escaped entity such as `&amp;lt;` survives as the literal `&lt;`.
+local function unescape(s)
+    if not s then
+        return s
+    end
+    return (s:gsub("&lt;", "<")
+        :gsub("&gt;", ">")
+        :gsub("&quot;", '"')
+        :gsub("&apos;", "'")
+        :gsub("&amp;", "&"))
+end
+
+-- Reads a double-quoted attribute out of a start-tag's text.
+local function attr(tag, name)
+    return unescape(tag:match(name .. '%s*=%s*"([^"]*)"'))
+end
 
 -- Given a filepath, /path/to/test_results.trx,
 -- returns table with the following structure:
 -- {
---      { project = "project_name", testName = "test_name", outcome = "Passed", duration = 0.1, output = {} },
---      { project = "project_name", testName = "test_name", outcome = "Passed", duration = 0.1, output = {} },
+--      { testName = "test_name", outcome = "Passed", duration = "00:00:00.1", startTime = "...", endTime = "...", output = nil },
+--      { testName = "test_name", outcome = "Failed", ..., output = { Message = "...", StackTrace = "..." } },
 --      ...
 --  }
--- Uses xml2lua to parse the trx file.
+-- The .trx format is XML. Each result is a <UnitTestResult> element whose
+-- attributes hold the summary fields; failures carry an <ErrorInfo> child with
+-- <Message>/<StackTrace> text. We scan for those with Lua patterns rather than
+-- a full XML parser so the plugin has no LuaRocks dependency.
 M.parse_trx_file = function(file_path)
-    -- Read the .trx XML content
     local file = io.open(file_path, "r")
     if not file then
-       return nil
-    end
-    local xml_content = file:read("*all")
-    file:close()
-
-    local function clean_xml(xml)
-        -- Remove BOM if present
-        xml = xml:gsub("^\239\187\191", "") -- UTF-8 BOM (EF BB BF)
-
-        -- Trim any leading junk before the XML declaration
-        local start_pos = xml_content:find("<%?xml")
-        if start_pos then
-            xml_content = xml_content:sub(start_pos)
-        end
-
-        return xml
-    end
-    xml_content = clean_xml(xml_content)
-
-    -- Parse the XML using xml2lua
-    local tree = handler:new()
-    local parser = xml2lua.parser(tree)
-    parser:parse(xml_content)
-
-    -- Extract test results from the TestResults node
-    local test_results = {}
-    local results = tree.root and tree.root.TestRun and tree.root.TestRun.Results and tree.root.TestRun.Results.UnitTestResult
-
-    local get_output = function(test_result)
-        if test_result.Output and test_result.Output.ErrorInfo then
-            return {
-                Message = test_result.Output.ErrorInfo.Message,
-                StackTrace = test_result.Output.ErrorInfo.StackTrace,
-            }
-        end
         return nil
     end
+    local content = file:read("*all")
+    file:close()
 
-    if results then
-        -- If there are multiple test results, iterate over them
-        if type(results) == "table" and #results > 0 then
-            for _, test in ipairs(results) do
-                table.insert(test_results, {
-                    testName = test._attr.testName,
-                    outcome = test._attr.outcome,
-                    duration = test._attr.duration,
-                    startTime = test._attr.startTime,
-                    endTime = test._attr.endTime,
-                    output = get_output(test)
-                })
-            end
-        else
-            -- Handle single test case scenario
-            table.insert(test_results, {
-                testName = results._attr.testName,
-                outcome = results._attr.outcome,
-                duration = results._attr.duration,
-                startTime = results._attr.startTime,
-                endTime = results._attr.endTime,
-                output = get_output(results)
-            })
+    local test_results = {}
+    local pos = 1
+    while true do
+        local open_start = content:find("<UnitTestResult", pos, true)
+        if not open_start then
+            break
         end
+
+        -- The start-tag ends at the next '>'. Attribute values in a .trx never
+        -- contain a literal '>' (it is escaped as &gt;), so a plain find is safe.
+        local open_end = content:find(">", open_start, true)
+        if not open_end then
+            break
+        end
+
+        local open_tag = content:sub(open_start, open_end)
+        local self_closing = open_tag:sub(-2) == "/>"
+
+        local output = nil
+        if not self_closing then
+            local close = content:find("</UnitTestResult>", open_end, true)
+            local body = content:sub(open_end + 1, close and close - 1 or #content)
+
+            local err_info = body:match("<ErrorInfo>(.-)</ErrorInfo>")
+            if err_info then
+                output = {
+                    Message = unescape(err_info:match("<Message>(.-)</Message>")) or "",
+                    StackTrace = unescape(err_info:match("<StackTrace>(.-)</StackTrace>")) or "",
+                }
+            end
+
+            pos = (close or open_end) + 1
+        else
+            pos = open_end + 1
+        end
+
+        table.insert(test_results, {
+            testName = attr(open_tag, "testName"),
+            outcome = attr(open_tag, "outcome"),
+            duration = attr(open_tag, "duration"),
+            startTime = attr(open_tag, "startTime"),
+            endTime = attr(open_tag, "endTime"),
+            output = output,
+        })
     end
 
     return test_results
