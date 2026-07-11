@@ -57,6 +57,15 @@ local function stop_spinner()
     end
 end
 
+-- Kills the in-flight `dotnet test` job, if any. Its on_exit still fires (with
+-- guards) so state is cleaned up regardless of how the job ends.
+local function stop_job()
+    if M.job_id then
+        pcall(vim.fn.jobstop, M.job_id)
+        M.job_id = nil
+    end
+end
+
 -- Advances the loader one frame. The output-window header and every running
 -- circle in the test list share the frame so they animate in sync. Updates are
 -- by extmark id, so they work even while the buffers are non-modifiable.
@@ -523,12 +532,13 @@ local run_test = function()
     -- across job callbacks (which garbled multi-project summaries before).
     local stdout_lines, stderr_lines = {}, {}
     local cmd ="dotnet test " .. target .. filter .. " --logger \"trx;LogFileName=nvim_dotnet_results.trx\""
-    vim.fn.jobstart(cmd, {
+    M.job_id = vim.fn.jobstart(cmd, {
         stdout_buffered = true,
         stderr_buffered = true,
         on_stdout = function(_, data) if data then stdout_lines = data end end,
         on_stderr = function(_, data) if data then stderr_lines = data end end,
         on_exit = function()
+            M.job_id = nil
             stop_spinner()
             clear_running()
             load_results()
@@ -626,7 +636,12 @@ local create_windows = function()
         border = "rounded",
     })
 
-    utils.create_knot({M.win_tests, M.win_results, M.win_output})
+    -- Closing the runner (focus leaves or a window closes) also kills the
+    -- in-flight test job and stops the loader.
+    utils.create_knot({M.win_tests, M.win_results, M.win_output}, function()
+        stop_spinner()
+        stop_job()
+    end)
 
     -- Creates autocmd that if the cursor in the bufrnr_tests is moved, the results are updated
     vim.api.nvim_create_autocmd("CursorMoved", {

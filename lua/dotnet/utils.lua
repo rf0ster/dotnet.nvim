@@ -132,7 +132,7 @@ function M.set_keymaps(bufnrs, keymaps)
     end
 end
 
-function M.create_knot(win_ids)
+function M.create_knot(win_ids, on_close)
     -- Convert window IDs to a lookup set for fast access
     local win_set = {}
     for _, id in ipairs(win_ids) do
@@ -148,8 +148,18 @@ function M.create_knot(win_ids)
         pcall(function() vim.api.nvim_del_augroup_by_id(group_id) end)
     end
 
-    -- Function to close all the windows and clear the autocmds
+    -- Function to close all the windows and clear the autocmds. Guarded so the
+    -- optional on_close callback runs exactly once even though closing the
+    -- windows can re-trigger the WinClosed/WinEnter autocmds below.
+    local closed = false
     local function close_all()
+      if closed then
+        return
+      end
+      closed = true
+      if on_close then
+        pcall(on_close)
+      end
       for _, win in ipairs(win_ids) do
         if vim.api.nvim_win_is_valid(win) then
           vim.api.nvim_win_close(win, true)
