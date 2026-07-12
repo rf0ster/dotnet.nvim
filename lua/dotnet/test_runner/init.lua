@@ -192,10 +192,62 @@ local function get_test_info()
 end
 
 
--- Loads the tests from the solution
-local function load_tests()
+-- Parses the `dotnet test --list-tests` output for a single project into an
+-- M.tests entry, or nil if the project has no discoverable tests.
+local function parse_project_tests(project, output)
+    local tests = nil
+    local test_capture_start = false
+    for _, line in ipairs(output) do
+        -- If the line contains the text "The following Tests are available",
+        -- then we can start capturing the tests.
+        -- This is a major assumption of the dotnet cli, andy may break in the future.
+        if line:find('The following Tests are available') then
+            test_capture_start = true
+        elseif test_capture_start and line ~= '' then
+            if tests == nil then
+                tests = {}
+            end
+            local name = line:match("^%s*(.-)%s*$")
+            if name ~= nil and name ~= "" and not name:find("Workload updates are available") then
+                tests[name] = {
+                    name = name,
+                    result = { "No Results" }
+                }
+            end
+        end
+    end
+
+    if tests == nil then
+        return nil
+    end
+
+    -- Strip the project file to its directory. Match up to the last separator
+    -- of either kind so this works whether path_abs comes through with POSIX
+    -- "/" or Windows "\" separators; without the "\\" branch a backslash path
+    -- would yield nil here and blow up the concatenation below on Windows.
+    local dir = project.path_abs:match("(.*[/\\])")
+    local results_file
+    if vim.fn.has("win32") == 1 or vim.fn.has("win64") == 1 then
+        results_file = dir .. "TestResults\\nvim_dotnet_results.trx"
+    else
+        results_file = dir .. "TestResults/nvim_dotnet_results.trx"
+    end
+
+    return {
+        project = project,
+        results_file = results_file,
+        tests = tests,
+    }
+end
+
+-- Loads the tests from the solution one project at a time, yielding to the
+-- event loop between each (blocking) `dotnet test --list-tests` call so the
+-- window paints and the loading spinner keeps animating while discovery runs.
+-- Invokes on_done once every project has been processed.
+local function load_tests_async(on_done)
     local sln = manager.load_solution()
     if sln == nil or sln.projects == nil then
+        on_done()
         return
     end
 
@@ -214,50 +266,31 @@ local function load_tests()
     M.tests = {}
 
     local cli = DotnetCli:new({})
-    for _, project in ipairs(sln.projects) do
+    local index = 1
+    local function step()
+        local project = sln.projects[index]
+        if project == nil then
+            on_done()
+            return
+        end
+
         local output = cli:test_list_all(project.path_abs)
         if not output then
-            break
+            on_done()
+            return
         end
 
-        local tests = nil
-        local test_capture_start = false
-        for _, line in ipairs(output) do
-            -- If the line contains the text "The following Tests are available",
-            -- then we can start capturing the tests.
-            -- This is a major assumption of the dotnet cli, andy may break in the future.
-            if line:find('The following Tests are available') then
-                test_capture_start = true
-            elseif test_capture_start and line ~= '' then
-                if tests == nil then
-                    tests = {}
-                end
-                local name = line:match("^%s*(.-)%s*$")
-                if name ~= nil and name ~= "" and not name:find("Workload updates are available") then
-                    tests[name] = {
-                        name = name,
-                        result = { "No Results" }
-                    }
-                end
-            end
+        local entry = parse_project_tests(project, output)
+        if entry ~= nil then
+            entry.collapsed = prev_collapsed[project.path_rel]
+            M.tests[project.path_rel] = entry
         end
 
-        if tests ~= nil then
-            local results_file = project.path_abs:match("(.*/)")
-            if vim.fn.has("win32") == 1 or vim.fn.has("win64") == 1 then
-                results_file = results_file .. "\\TestResults\\nvim_dotnet_results.trx"
-            else
-                results_file = results_file .. "TestResults/nvim_dotnet_results.trx"
-            end
-
-            M.tests[project.path_rel] = {
-                project = project,
-                results_file = results_file,
-                tests = tests,
-                collapsed = prev_collapsed[project.path_rel]
-            }
-        end
+        index = index + 1
+        vim.schedule(step)
     end
+
+    vim.schedule(step)
 end
 
 local load_results = function()
@@ -406,6 +439,35 @@ local write_tests_to_buffer = function()
     end
 
     set_buf_modifiable(M.bufnr_tests, false)
+end
+
+-- Paints a placeholder with an animated spinner while tests are being
+-- discovered, so the window shows up immediately instead of after the
+-- (blocking) load finishes and leaving the user staring at nothing.
+local write_loading_to_buffer = function()
+    set_buf_modifiable(M.bufnr_tests, true)
+
+    -- Rebuilt below; the animation timer reads this fresh each tick.
+    M.running_marks = {}
+
+    vim.api.nvim_buf_clear_namespace(M.bufnr_tests, ns_id, 0, -1)
+    vim.api.nvim_buf_set_lines(M.bufnr_tests, 0, -1, false, {
+        " (R)eload Tests    (<Tab>) Fold Project",
+        "",
+        "    Loading tests...",
+    })
+    vim.api.nvim_win_set_cursor(M.win_tests, {1, 0})
+
+    -- Reserve the cell before the text for the animated spinner glyph. Reusing
+    -- M.running_marks lets the existing spinner_tick loop animate it for free.
+    local mark_id = vim.api.nvim_buf_set_extmark(M.bufnr_tests, ns_id, 2, 2, {
+        virt_text = {{spinner_frames[M.spinner_idx], "Comment"}},
+        virt_text_pos = "overlay",
+    })
+    M.running_marks = {{ line = 2, col = 2, id = mark_id }}
+
+    set_buf_modifiable(M.bufnr_tests, false)
+    start_spinner()
 end
 
 -- Rewrites the buffer while keeping the cursor on its current row. Collapsing a
@@ -730,22 +792,39 @@ local set_buffer_options = function(bufnr)
     vim.api.nvim_buf_set_option(bufnr, "cursorline", true)   -- highlight current line
 end
 
--- Reloads the tests and writes them to the buffer
-M.reload = function()
-    load_tests()
+-- Repaints the tests once discovery finishes. Guards against the window having
+-- been closed while the async load was still in flight.
+local function finish_loading()
+    stop_spinner()
+    if not (M.win_tests and vim.api.nvim_win_is_valid(M.win_tests)) then
+        return
+    end
     load_results()
     write_tests_to_buffer()
 end
 
+-- Reloads the tests and writes them to the buffer
+M.reload = function()
+    write_loading_to_buffer()
+    load_tests_async(finish_loading)
+end
+
 -- Opens the test runner window
 M.open = function()
-    if M.tests == nil then
-        load_tests()
-    end
-    load_results()
     create_windows()
-    write_tests_to_buffer()
     set_buffer_options(M.bufnr_tests)
+
+    if M.tests == nil then
+        -- First open: show the window right away with a loading indicator, then
+        -- discover tests without blocking the initial paint.
+        write_loading_to_buffer()
+        load_tests_async(finish_loading)
+    else
+        -- Tests were already discovered on a previous open; just refresh the
+        -- results and repaint.
+        load_results()
+        write_tests_to_buffer()
+    end
 end
 
 return M
