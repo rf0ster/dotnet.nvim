@@ -195,7 +195,9 @@ The test runner provides an interactive interface with three panes:
 ### Test Runner Keymaps
 
 When in the test runner window:
-- `<CR>` (Enter) - Run the test/project/solution under cursor
+- `r` - Run the test/project/solution under cursor
+- `<CR>` (Enter) - Fold/unfold the project under the cursor (`<Tab>` and `za` do the same)
+- `zM` / `zR` - Fold/unfold every project
 - `R` - Reload tests
 
 ## NuGet Package Manager

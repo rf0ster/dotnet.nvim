@@ -9,9 +9,10 @@
 local M = {}
 
 -- Root directory for persisted results, under Neovim's data dir
--- (e.g. ~/.local/share/nvim/dotnet.nvim/test_results).
+-- (e.g. ~/.local/share/nvim/dotnet.nvim/test_results). stdpath is backslashed
+-- on Windows, so normalize to keep the joined path from mixing separators.
 local function store_dir()
-    return vim.fn.stdpath("data") .. "/dotnet.nvim/test_results"
+    return vim.fs.normalize(vim.fn.stdpath("data")) .. "/dotnet.nvim/test_results"
 end
 
 -- Stable, filesystem-safe file name derived from the solution's absolute path,

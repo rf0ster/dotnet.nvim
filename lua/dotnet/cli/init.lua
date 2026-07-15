@@ -5,6 +5,21 @@ DotnetCli.__index = DotnetCli
 --- Singleton instance of the DotnetCli class if needed.
 local singleton_instance = nil
 
+--- Environment applied to every dotnet job.
+---
+--- MSBuild keeps its worker nodes alive after a build so the next one can reuse
+--- them (on by default on Windows). Those nodes inherit the job's stdout/stderr
+--- handles, so the pipe never closes even once `dotnet` itself has exited, and a
+--- caller that waits on the output stream waits forever. Disabling node reuse is
+--- what keeps a `dotnet` job from hanging.
+function DotnetCli.job_env()
+    return {
+        MSBUILDDISABLENODEREUSE = "1",
+        DOTNET_CLI_TELEMETRY_OPTOUT = "1",
+        DOTNET_NOLOGO = "1",
+    }
+end
+
 --- Creates a new instance of the DotnetCli class.
 --- @param opts table Options for the DotnetCli instance.
 function DotnetCli:new(opts)
@@ -96,6 +111,32 @@ function DotnetCli:run_background_cmd(cmd)
     local res = vim.fn.systemlist(cmd)
     self.on_background_exit()
     return res
+end
+
+--- Runs a .NET command in the background without blocking the editor.
+---
+--- The arguments are passed as a list rather than a shell string, so no shell
+--- ever re-splits them: project paths containing spaces and test names
+--- containing parentheses reach `dotnet` intact.
+---
+--- @param args table Argument list for dotnet, e.g. { "test", "--list-tests", path }.
+--- @param on_done fun(lines: table, code: number) Called on the main loop with
+---   the command's stdout split into lines and its exit code.
+--- @return table handle The running process; call handle:kill(sig) to cancel it.
+function DotnetCli:run_background_cmd_async(args, on_done)
+    local cmd = { "dotnet" }
+    vim.list_extend(cmd, args)
+
+    self.on_background_start()
+    return vim.system(cmd, { text = true, env = DotnetCli.job_env() }, function(res)
+        -- Split on CRLF or LF so Windows line endings do not leave a trailing
+        -- carriage return on every line.
+        local lines = vim.split(res.stdout or "", "\r?\n")
+        vim.schedule(function()
+            self.on_background_exit()
+            on_done(lines, res.code)
+        end)
+    end)
 end
 
 --- Returns the history of commands run by the DotnetCli instance.
@@ -288,6 +329,20 @@ end
 --- @return table A table containing the list of tests.
 function DotnetCli:test_list_all(target)
     return self:run_background_cmd("dotnet test --list-tests " .. add_target(target))
+end
+
+--- Lists all tests in a .NET project or solution without blocking the editor.
+--- `dotnet test --list-tests` restores and builds the target, which takes long
+--- enough that doing it synchronously freezes Neovim.
+--- @param target string|nil The path to the project or solution file. Lists tests from local directory if nil.
+--- @param on_done fun(lines: table, code: number) Receives the command's output.
+--- @return table handle The running process; call handle:kill(sig) to cancel it.
+function DotnetCli:test_list_all_async(target, on_done)
+    local args = { "test", "--list-tests" }
+    if target ~= nil then
+        table.insert(args, target)
+    end
+    return self:run_background_cmd_async(args, on_done)
 end
 
 --- Runs tests for a .NET project or solution using MSTest.

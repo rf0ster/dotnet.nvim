@@ -66,6 +66,19 @@ local function stop_job()
     end
 end
 
+-- Abandons any in-flight test discovery. Bumping the token makes the callbacks
+-- of the current chain no-ops, so a reload that lands while an earlier one is
+-- still walking the projects cannot interleave with it (both would otherwise
+-- write into M.tests and fight over the buffer's modifiable flag).
+M.load_token = 0
+local function stop_load()
+    M.load_token = M.load_token + 1
+    if M.load_handle then
+        pcall(function() M.load_handle:kill(15) end)
+        M.load_handle = nil
+    end
+end
+
 -- Advances the loader one frame. The output-window header and every running
 -- circle in the test list share the frame so they animate in sync. Updates are
 -- by extmark id, so they work even while the buffers are non-modifiable.
@@ -226,12 +239,15 @@ local function parse_project_tests(project, output)
     -- "/" or Windows "\" separators; without the "\\" branch a backslash path
     -- would yield nil here and blow up the concatenation below on Windows.
     local dir = project.path_abs:match("(.*[/\\])")
-    local results_file
-    if vim.fn.has("win32") == 1 or vim.fn.has("win64") == 1 then
-        results_file = dir .. "TestResults\\nvim_dotnet_results.trx"
-    else
-        results_file = dir .. "TestResults/nvim_dotnet_results.trx"
+    if dir == nil then
+        return nil
     end
+
+    -- Always join with "/". Windows accepts forward slashes, so there is no
+    -- need to branch on the platform (and path_abs is already normalized to
+    -- forward slashes by the solution parsers, so branching produced a path
+    -- with mixed separators).
+    local results_file = dir .. "TestResults/nvim_dotnet_results.trx"
 
     return {
         project = project,
@@ -240,13 +256,27 @@ local function parse_project_tests(project, output)
     }
 end
 
--- Loads the tests from the solution one project at a time, yielding to the
--- event loop between each (blocking) `dotnet test --list-tests` call so the
--- window paints and the loading spinner keeps animating while discovery runs.
--- Invokes on_done once every project has been processed.
+-- Loads the tests from the solution one project at a time. Each
+-- `dotnet test --list-tests` runs as a real background process and the next
+-- project is only started from its completion callback, so the editor stays
+-- responsive and the loading spinner keeps animating for however long the
+-- restore+build behind --list-tests takes.
+--
+-- Invokes on_done once every project has been processed. A discovery chain that
+-- is superseded (a second reload) or cancelled (the runner is closed) stops at
+-- its next callback and never calls on_done.
 local function load_tests_async(on_done)
+    -- Supersede any chain already in flight and claim this one, before the
+    -- early return below can leave an older chain running against fresh state.
+    stop_load()
+    local token = M.load_token
+
     local sln = manager.load_solution()
     if sln == nil or sln.projects == nil then
+        -- No solution: leave the state empty rather than nil, so the callers
+        -- below can render an empty runner instead of erroring on a nil index.
+        M.tests = M.tests or {}
+        M.sln_outcome = M.sln_outcome or { result = nil, sln_name = nil }
         on_done()
         return
     end
@@ -270,30 +300,41 @@ local function load_tests_async(on_done)
     local function step()
         local project = sln.projects[index]
         if project == nil then
+            M.load_handle = nil
             on_done()
             return
         end
 
-        local output = cli:test_list_all(project.path_abs)
-        if not output then
-            on_done()
-            return
-        end
+        M.load_handle = cli:test_list_all_async(project.path_abs, function(output)
+            -- A newer reload started, or the runner was closed, while this
+            -- project was building. Drop the result and stop the chain.
+            if token ~= M.load_token then
+                return
+            end
+            M.load_handle = nil
 
-        local entry = parse_project_tests(project, output)
-        if entry ~= nil then
-            entry.collapsed = prev_collapsed[project.path_rel]
-            M.tests[project.path_rel] = entry
-        end
+            local entry = parse_project_tests(project, output)
+            if entry ~= nil then
+                entry.collapsed = prev_collapsed[project.path_rel]
+                M.tests[project.path_rel] = entry
+            end
 
-        index = index + 1
-        vim.schedule(step)
+            index = index + 1
+            step()
+        end)
     end
 
-    vim.schedule(step)
+    step()
 end
 
 local load_results = function()
+    -- Discovery can finish with nothing loaded (no solution in the cwd, or a
+    -- solution whose projects all failed to build), so neither of these is
+    -- guaranteed to be populated by the time we get here.
+    if M.tests == nil or M.sln_outcome == nil then
+        return
+    end
+
     -- Fold each project's latest .trx into the persistent store. A run
     -- overwrites the .trx with only the tests it covered, so merging (newest
     -- result per test wins) is what keeps state for tests outside that run.
@@ -396,12 +437,14 @@ local write_tests_to_buffer = function()
     -- Sets cursor to first line in buffer
     vim.api.nvim_win_set_cursor(M.win_tests, {1, 0})
     -- Write header in the first line of the buffer
-    vim.api.nvim_buf_set_lines(M.bufnr_tests, 0, -1, false, {" (R)eload Tests    (<Tab>) Fold Project"})
+    vim.api.nvim_buf_set_lines(M.bufnr_tests, 0, -1, false, {" (r)un Test    (R)eload Tests    (<CR>) Fold Project"})
     -- Write an empy line to the buffer
     vim.api.nvim_buf_set_lines(M.bufnr_tests, 1, -1, false, {""})
 
-    -- Load the tests
-    if M.tests == nil then
+    -- Nothing discovered (no solution, or no project with tests). Leave the
+    -- header in place rather than erroring on the nil state below.
+    if M.tests == nil or M.sln_outcome == nil or M.sln_outcome.sln_name == nil then
+        set_buf_modifiable(M.bufnr_tests, false)
         return
     end
 
@@ -452,7 +495,7 @@ local write_loading_to_buffer = function()
 
     vim.api.nvim_buf_clear_namespace(M.bufnr_tests, ns_id, 0, -1)
     vim.api.nvim_buf_set_lines(M.bufnr_tests, 0, -1, false, {
-        " (R)eload Tests    (<Tab>) Fold Project",
+        " (r)un Test    (R)eload Tests    (<CR>) Fold Project",
         "",
         "    Loading tests...",
     })
@@ -506,6 +549,23 @@ local set_all_collapsed = function(collapsed)
     rewrite_keeping_cursor()
 end
 
+-- Builds the --filter expression that selects a single test.
+--
+-- `--list-tests` reports *display* names, and a parameterized test's display name
+-- carries its arguments: "MyTests.UnitTest1.AddsNumbers(a: 1, b: 2)". vstest's
+-- filter grammar treats "(", ")" and "," as operators, and no escaping of them is
+-- accepted -- xUnit rejects "\(" and "\," as unrecognized escape sequences -- so
+-- such a display name cannot be expressed as an exact filter at all. Filter on
+-- the fully qualified method instead (the part before the argument list). For an
+-- ordinary test that is an exact match; for a parameterized one it runs every
+-- case of the theory, which is harmless: the .trx records each case under its own
+-- display name, so merging it back into the store still lights up exactly the
+-- rows that ran.
+local function test_filter(name)
+    local method = name:match("^(.-)%(") or name
+    return "FullyQualifiedName=" .. method
+end
+
 local run_test = function()
     local info = get_test_info()
     local s = info.sln_name
@@ -514,11 +574,6 @@ local run_test = function()
 
     if not p and not s then
         return
-    end
-
-    local filter = ""
-    if t then
-        filter = " --filter " .. t
     end
 
     -- Collapse runs of blank lines; true so leading/duplicate blanks are dropped.
@@ -593,8 +648,25 @@ local run_test = function()
     -- back a complete, correctly-bounded line list, so lines never get torn
     -- across job callbacks (which garbled multi-project summaries before).
     local stdout_lines, stderr_lines = {}, {}
-    local cmd ="dotnet test " .. target .. filter .. " --logger \"trx;LogFileName=nvim_dotnet_results.trx\""
+
+    -- Pass the command as a list, not a string: a string is run through 'shell',
+    -- which re-splits it. A project path containing a space, or a test name
+    -- containing parentheses, would be torn apart by cmd.exe or by the shell
+    -- before dotnet ever saw it. Target absolutely, too, since the job inherits
+    -- Neovim's cwd, which need not be the solution's directory.
+    local target_path = (p and M.tests[p] and M.tests[p].project.path_abs)
+        or manager.sln_path_abs
+        or target
+    local cmd = { "dotnet", "test", target_path }
+    if t then
+        table.insert(cmd, "--filter")
+        table.insert(cmd, test_filter(t))
+    end
+    table.insert(cmd, "--logger")
+    table.insert(cmd, "trx;LogFileName=nvim_dotnet_results.trx")
+
     M.job_id = vim.fn.jobstart(cmd, {
+        env = DotnetCli.job_env(),
         stdout_buffered = true,
         stderr_buffered = true,
         on_stdout = function(_, data) if data then stdout_lines = data end end,
@@ -678,6 +750,14 @@ local create_windows = function()
     end
 
     -- Create test selection window
+    -- The buffers below are fresh, and the runner's buffers are wiped on close
+    -- ('bufhidden' = wipe), so every extmark id we are still holding refers to a
+    -- buffer that no longer exists. Drop them: a stale header_mark would send
+    -- the spinner to write at column 1 of the new output buffer's empty first
+    -- line, which throws "Invalid 'col': out of range" on every tick.
+    M.header_mark = nil
+    M.running_marks = {}
+
     M.bufnr_tests = vim.api.nvim_create_buf(false, true)
     M.win_tests = create_win(M.bufnr_tests, "Test Runner", col, math.floor(width * 0.5) - 1)
 
@@ -699,10 +779,12 @@ local create_windows = function()
     })
 
     -- Closing the runner (focus leaves or a window closes) also kills the
-    -- in-flight test job and stops the loader.
+    -- in-flight test job, abandons any test discovery still walking the
+    -- projects, and stops the loader.
     utils.create_knot({M.win_tests, M.win_results, M.win_output}, function()
         stop_spinner()
         stop_job()
+        stop_load()
     end)
 
     -- Creates autocmd that if the cursor in the bufrnr_tests is moved, the results are updated
@@ -713,12 +795,16 @@ local create_windows = function()
             local p = info.proj_name or ""
             local t = info.test_name or ""
 
-            if p == "" or t == "" then
+            -- The cursor can sit on a line that no longer corresponds to a
+            -- known test: the loading placeholder, or stale text from before a
+            -- reload emptied M.tests.
+            local entry = M.tests and M.tests[p] and M.tests[p].tests[t]
+            if p == "" or t == "" or entry == nil then
                 vim.api.nvim_buf_set_lines(M.bufnr_results, 0, -1, false, {})
                 return
             end
 
-            local result = M.tests[p].tests[t].result
+            local result = entry.result
             local nil_to_str = function(v)
                 if v == nil then
                     return ""
@@ -751,7 +837,7 @@ local create_windows = function()
     -- set current window to the test window
     vim.api.nvim_set_current_win(M.win_tests)
 
-    vim.api.nvim_buf_set_keymap(M.bufnr_tests, "n", "<CR>", "", {
+    vim.api.nvim_buf_set_keymap(M.bufnr_tests, "n", "r", "", {
         noremap = true,
         silent = true,
         callback = run_test
@@ -762,9 +848,9 @@ local create_windows = function()
         callback = M.reload
     })
 
-    -- Fold the project under the cursor. <Tab> and za both toggle it; zM/zR
+    -- Fold the project under the cursor. <CR>, <Tab> and za all toggle it; zM/zR
     -- collapse/expand every project at once (mirroring Vim's fold commands).
-    for _, key in ipairs({ "<Tab>", "za" }) do
+    for _, key in ipairs({ "<CR>", "<Tab>", "za" }) do
         vim.api.nvim_buf_set_keymap(M.bufnr_tests, "n", key, "", {
             noremap = true,
             silent = true,
