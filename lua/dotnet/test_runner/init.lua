@@ -551,19 +551,25 @@ end
 
 -- Builds the --filter expression that selects a single test.
 --
--- `--list-tests` reports *display* names, and a parameterized test's display name
--- carries its arguments: "MyTests.UnitTest1.AddsNumbers(a: 1, b: 2)". vstest's
--- filter grammar treats "(", ")" and "," as operators, and no escaping of them is
--- accepted -- xUnit rejects "\(" and "\," as unrecognized escape sequences -- so
--- such a display name cannot be expressed as an exact filter at all. Filter on
--- the fully qualified method instead (the part before the argument list). For an
--- ordinary test that is an exact match; for a parameterized one it runs every
--- case of the theory, which is harmless: the .trx records each case under its own
--- display name, so merging it back into the store still lights up exactly the
--- rows that ran.
+-- `--list-tests` reports *display* names, and those differ by framework: xUnit
+-- and NUnit emit the fully qualified name ("MyTests.UnitTest1.AddsNumbers")
+-- while MSTest emits only the bare method name ("TestMethod2"). vstest's "="
+-- operator is an *exact* match against the real fully qualified name, so an
+-- MSTest display name of "TestMethod2" never matches "Testy.UnitTest1.TestMethod2"
+-- and the run fails with "No test matches the given testcase filter". Use the "~"
+-- (contains) operator so a bare method name or a full name both match.
+--
+-- A parameterized test's display name also carries its arguments:
+-- "MyTests.UnitTest1.AddsNumbers(a: 1, b: 2)". vstest's filter grammar treats
+-- "(", ")" and "," as operators, and no escaping is accepted -- xUnit rejects
+-- "\(" and "\," as unrecognized escape sequences -- so we strip the argument list
+-- and filter on the method (the part before it). Contains-matching may run more
+-- than the one selected case (every case of a theory, or a same-prefix sibling),
+-- which is harmless: the .trx records each case under its own display name, so
+-- merging it back into the store still lights up exactly the rows that ran.
 local function test_filter(name)
     local method = name:match("^(.-)%(") or name
-    return "FullyQualifiedName=" .. method
+    return "FullyQualifiedName~" .. method
 end
 
 local run_test = function()
